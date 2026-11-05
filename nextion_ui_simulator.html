@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Nextion NX3224T024 Screen Simulator - W3PM MEPT AB0E</title>
+  <style>
+    :root {
+      --bg-body: #0d1117;
+      --bezel-color: #1a1e24;
+      --bezel-border: #30363d;
+      --screen-bg: #00003f; /* RGB565: 31 Navy */
+      --card-bg: #101c2a;
+      --text-white: #ffffff;
+      --text-cyan: #00f0ff;
+      --text-amber: #ffaa00;
+      --text-green: #00ff66;
+      --text-gray: #8b949e;
+      --btn-base: #2a3b52;
+      --btn-sel: #1a5b5b;
+      --btn-save: #1e5a22;
+      --btn-menu: #7a1f1d;
+      --btn-hover: #ffea00;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; }
+    body { background-color: var(--bg-body); color: #c9d1d9; display: flex; flex-direction: column; align-items: center; padding: 24px 16px; min-height: 100vh; }
+    
+    header { text-align: center; margin-bottom: 20px; }
+    header h1 { font-size: 22px; color: #58a6ff; margin-bottom: 6px; }
+    header p { font-size: 13px; color: var(--text-gray); }
+
+    .sim-wrapper {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 24px;
+      justify-content: center;
+      align-items: flex-start;
+      max-width: 960px;
+      width: 100%;
+    }
+
+    /* Nextion 2.8" Hardware Bezel (320x240 LCD active area) */
+    .nextion-enclosure {
+      background: linear-gradient(145deg, #22272e, #161b22);
+      border: 3px solid #30363d;
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+      position: relative;
+    }
+
+    .brand-tag {
+      font-size: 10px;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .screen-canvas {
+      width: 320px;
+      height: 240px;
+      background-color: var(--screen-bg);
+      border: 2px solid #000;
+      box-shadow: inset 0 0 10px rgba(0,0,0,0.8);
+      position: relative;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    /* Screen Elements - Page 0 (Main) */
+    .p0-header {
+      width: 100%;
+      height: 28px;
+      background: #04101c;
+      border-bottom: 1px solid #1f364d;
+      display: flex;
+      align-items: center;
+      padding: 0 6px;
+      font-size: 11px;
+    }
+    .p0-call { color: #fff; font-weight: bold; font-size: 13px; margin-right: 8px; }
+    .p0-grid { color: var(--text-cyan); font-weight: bold; margin-right: 10px; }
+    .p0-title { color: var(--text-gray); font-size: 10px; flex-grow: 1; }
+    .p0-nav-btn {
+      background: #2a3b52;
+      border: 1px solid #48658a;
+      color: #fff;
+      font-size: 9px;
+      padding: 2px 6px;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    .p0-nav-btn:hover { background: #385072; }
+
+    .p0-telemetry-card {
+      margin: 4px 6px;
+      background: var(--card-bg);
+      border: 1px solid #243b55;
+      border-radius: 4px;
+      padding: 5px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .telem-line {
+      font-family: "Consolas", monospace;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .line-0 { font-size: 13px; color: #ffffff; font-weight: bold; }
+    .line-1 { font-size: 12px; color: var(--text-cyan); }
+    .line-2 { font-size: 12px; color: var(--text-amber); font-weight: 500; }
+    .line-3 { font-size: 11px; color: var(--text-green); }
+
+    .progress-bar-container {
+      margin: 2px 6px 4px 6px;
+      height: 5px;
+      background: #0b1520;
+      border: 1px solid #1a2f44;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      width: 45%;
+      background: linear-gradient(90deg, #00f0ff, #00ff66);
+      transition: width 0.3s ease;
+    }
+
+    /* Touch Button Matrix */
+    .touch-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(2, 41px);
+      gap: 4px;
+      padding: 2px 6px;
+    }
+
+    .t-btn {
+      background: var(--btn-base);
+      border: 1px solid #4a678d;
+      border-radius: 4px;
+      color: #ffffff;
+      font-family: "Consolas", monospace;
+      font-size: 11px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.05s ease;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), 0 2px 4px rgba(0,0,0,0.5);
+    }
+    .t-btn:active, .t-btn.active {
+      transform: translateY(1px);
+      background: var(--btn-hover) !important;
+      color: #000 !important;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.6);
+    }
+    .t-btn.b-sel { background: var(--btn-sel); border-color: #2e8b8b; }
+    .t-btn.b-save { background: var(--btn-save); border-color: #388e3c; }
+    .t-btn.b-menu { background: var(--btn-menu); border-color: #b71c1c; }
+
+    /* Page 1: Relays View */
+    .page-container {
+      width: 100%;
+      height: 100%;
+      display: none;
+      flex-direction: column;
+      padding: 6px;
+      background: var(--screen-bg);
+    }
+    .page-container.active { display: flex; }
+
+    .relay-item {
+      background: #111a26;
+      border: 1px solid #20354a;
+      border-radius: 4px;
+      padding: 6px 8px;
+      margin-bottom: 5px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+    }
+    .relay-name { color: #fff; font-weight: bold; }
+    .relay-pin { color: var(--text-gray); font-size: 10px; }
+    .relay-status {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-weight: bold;
+    }
+    .status-on { background: rgba(0,255,102,0.2); color: #00ff66; border: 1px solid #00ff66; }
+    .status-off { background: rgba(139,148,158,0.2); color: #8b949e; border: 1px solid #484f58; }
+
+    /* Serial Monitor & Inspection Panel */
+    .inspector-panel {
+      flex: 1;
+      min-width: 320px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    }
+
+    .inspector-panel h2 {
+      font-size: 15px;
+      color: #58a6ff;
+      border-bottom: 1px solid #30363d;
+      padding-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .serial-log {
+      height: 150px;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 8px;
+      font-family: "Consolas", monospace;
+      font-size: 11px;
+      color: #39d353;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+
+    .live-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 12px;
+    }
+    .ctrl-group { display: flex; gap: 8px; align-items: center; }
+    .ctrl-group label { width: 80px; color: var(--text-gray); }
+    .ctrl-group input, .ctrl-group select {
+      flex: 1;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      color: #fff;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-family: "Consolas", monospace;
+      font-size: 11px;
+    }
+    .ctrl-group button {
+      background: #238636;
+      border: 1px solid #2ea043;
+      color: #fff;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .ctrl-group button:hover { background: #2ea043; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Nextion NX3224T024 UART Display Simulator</h1>
+    <p>320&times;240 Landscape Touch Interface | Station AB0E | Grid EM28 | Arduino UNO R4 WiFi</p>
+  </header>
+
+  <div class="sim-wrapper">
+    <!-- Physical Screen Enclosure -->
+    <div class="nextion-enclosure">
+      <div class="brand-tag">
+        <span>NEXTION BASIC 2.8"</span>
+        <span>NX3224T024 (90&deg;)</span>
+      </div>
+
+      <div class="screen-canvas" id="canvas">
+        <!-- PAGE 0: MAIN DASHBOARD -->
+        <div id="page0" class="page-container active">
+          <div class="p0-header">
+            <span class="p0-call">AB0E</span>
+            <span class="p0-grid">EM28</span>
+            <span class="p0-title">W3PM MEPT</span>
+            <button class="p0-nav-btn" onclick="switchPage(1)">LPF &gt;</button>
+          </div>
+
+          <div class="p0-telemetry-card">
+            <div class="telem-line line-0" id="t0">23:16:48 UTC GPS LOCKED</div>
+            <div class="telem-line line-1" id="t1">WSPR 20m 14.097100</div>
+            <div class="telem-line line-2" id="t2">Tx: 7dBm  SWR: 1.15</div>
+            <div class="telem-line line-3" id="t3">LPF: 20m [RELAY ON]</div>
+          </div>
+
+          <div class="progress-bar-container">
+            <div class="progress-bar-fill" id="j0"></div>
+          </div>
+
+          <div class="touch-grid">
+            <div class="t-btn" id="b0" onmousedown="pressBtn(0, '1', 'PB1  -')" onmouseup="releaseBtn(0)">PB1  -</div>
+            <div class="t-btn b-sel" id="b1" onmousedown="pressBtn(1, '2', 'PB2 SEL')" onmouseup="releaseBtn(1)">PB2 SEL</div>
+            <div class="t-btn" id="b2" onmousedown="pressBtn(2, '3', 'PB3 NXT')" onmouseup="releaseBtn(2)">PB3 NXT</div>
+            <div class="t-btn" id="b3" onmousedown="pressBtn(3, '4', 'PB4  +')" onmouseup="releaseBtn(3)">PB4  +</div>
+            <div class="t-btn b-save" id="b4" onmousedown="pressBtn(4, 'S', 'SAVE 2+3')" onmouseup="releaseBtn(4)">SAVE 2+3</div>
+            <div class="t-btn b-menu" id="b5" onmousedown="pressBtn(5, 'M', 'MENU')" onmouseup="releaseBtn(5)">MENU</div>
+          </div>
+        </div>
+
+        <!-- PAGE 1: LPF & RELAYS -->
+        <div id="page1" class="page-container">
+          <div class="p0-header">
+            <span class="p0-call" style="font-size: 11px;">LPF &amp; SWR RELAYS</span>
+            <span class="p0-title"></span>
+            <button class="p0-nav-btn" onclick="switchPage(0)">&lt; MAIN</button>
+          </div>
+
+          <div style="padding: 4px; display: flex; flex-direction: column; gap: 4px;">
+            <div class="relay-item">
+              <div>
+                <div class="relay-name">K1: SWR Bridge Relay</div>
+                <div class="relay-pin">Pin D4 (Active during ANT TUNE)</div>
+              </div>
+              <span class="relay-status status-off" id="rel_swr">BYPASSED</span>
+            </div>
+
+            <div class="relay-item">
+              <div>
+                <div class="relay-name">K2-K3: 40m Lowpass Filter</div>
+                <div class="relay-pin">Pin D5 (&le; 7.5 MHz)</div>
+              </div>
+              <span class="relay-status status-off" id="rel_40m">IDLE</span>
+            </div>
+
+            <div class="relay-item">
+              <div>
+                <div class="relay-name">K4-K5: 20m Lowpass Filter</div>
+                <div class="relay-pin">Pin D6 (7.5 &ndash; 15.0 MHz)</div>
+              </div>
+              <span class="relay-status status-on" id="rel_20m">ACTIVE</span>
+            </div>
+
+            <div class="relay-item">
+              <div>
+                <div class="relay-name">K6-K7: 10m Lowpass Filter</div>
+                <div class="relay-pin">Pin D7 (&gt; 15.0 MHz)</div>
+              </div>
+              <span class="relay-status status-off" id="rel_10m">IDLE</span>
+            </div>
+
+            <div style="display: flex; gap: 6px; margin-top: 4px;">
+              <button class="p0-nav-btn" style="flex: 1; height: 26px;" onclick="testSWRBridge()">TEST SWR BRIDGE (D4)</button>
+              <button class="p0-nav-btn" style="flex: 1; height: 26px;" onclick="switchPage(2)">SYMBOLS &gt;</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- PAGE 2: SYMBOLS DIAGNOSTICS -->
+        <div id="page2" class="page-container">
+          <div class="p0-header">
+            <span class="p0-call" style="font-size: 11px;">BEACON SYMBOLS</span>
+            <span class="p0-title"></span>
+            <button class="p0-nav-btn" onclick="switchPage(0)">&lt; MAIN</button>
+          </div>
+
+          <div style="padding: 6px; font-size: 11px; line-height: 1.5; color: #fff;">
+            <div><strong>Callsign / Grid:</strong> AB0E / EM28</div>
+            <div><strong>Tx Power:</strong> 7 dBm (5.0 mW EIRP)</div>
+            <div style="color: var(--text-cyan); margin-top: 4px;"><strong>FT8 (79 tones):</strong> CQ AB0E EM28</div>
+            <div style="font-size: 9px; color: #8b949e;">Sync Costas [3,1,4,0,6,5,2] + CRC14 0x2757</div>
+            <div style="color: var(--text-amber); margin-top: 4px;"><strong>WSPR (162 tones):</strong> AB0E EM28 7</div>
+            <div style="font-size: 9px; color: #8b949e;">4-FSK shift 1.4648 Hz | K=32 r=1/2</div>
+            <div style="color: var(--text-green); margin-top: 4px;"><strong>FST4W-120:</strong> 160 tones (120s)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Inspector & Serial Feed -->
+    <div class="inspector-panel">
+      <h2>
+        <span>UART Serial Monitor (Serial1)</span>
+        <button onclick="clearLog()" style="background: none; border: 1px solid #30363d; color: #8b949e; font-size: 10px; padding: 2px 6px; border-radius: 3px; cursor: pointer;">Clear</button>
+      </h2>
+      <div class="serial-log" id="serialLog">[System] Nextion Display initialized @ 9600 baud.
+[Display -> Arduino] bkcmd=0 [FF FF FF]
+[Display -> Arduino] sendxy=1 [FF FF FF]
+[Display -> Arduino] READY:AB0E
+</div>
+
+      <div class="live-controls">
+        <div style="font-weight: bold; color: #fff; margin-bottom: 2px;">Simulate Arduino Updates:</div>
+        <div class="ctrl-group">
+          <label>Band &amp; Mode:</label>
+          <select id="bandSel" onchange="updateBandMode()">
+            <option value="20m">20m - WSPR (14.097100 MHz)</option>
+            <option value="40m">40m - FT8 (7.074000 MHz)</option>
+            <option value="10m">10m - WSPR (28.126100 MHz)</option>
+          </select>
+        </div>
+        <div class="ctrl-group">
+          <label>Line 2 (SWR):</label>
+          <input type="text" id="swrIn" value="Tx: 7dBm  SWR: 1.15">
+          <button onclick="sendLine2()">Send</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let activePage = 0;
+    let logElem = document.getElementById("serialLog");
+
+    function log(msg) {
+      logElem.innerText += "\n" + msg;
+      logElem.scrollTop = logElem.scrollHeight;
+    }
+
+    function clearLog() {
+      logElem.innerText = "[Log Cleared]";
+    }
+
+    function switchPage(pg) {
+      activePage = pg;
+      for (let i = 0; i <= 2; i++) {
+        let p = document.getElementById("page" + i);
+        if (p) p.classList.toggle("active", i === pg);
+      }
+      log(`[Display -> Arduino] page ${pg} [FF FF FF]`);
+    }
+
+    function pressBtn(id, charCode, label) {
+      document.getElementById("b" + id).classList.add("active");
+      // Standard Nextion 0x65 component touch press event + ASCII shortcut
+      let compIdHex = "0x" + (id + 1).toString(16).padStart(2, "0");
+      log(`[Touch Press] ${label} -> ASCII '${charCode}' | Event 0x65 0x${activePage.toString(16).padStart(2,"0")} ${compIdHex} 0x01 [FF FF FF]`);
+    }
+
+    function releaseBtn(id) {
+      document.getElementById("b" + id).classList.remove("active");
+      let compIdHex = "0x" + (id + 1).toString(16).padStart(2, "0");
+      log(`[Touch Release] Button ${id} -> Event 0x65 0x${activePage.toString(16).padStart(2,"0")} ${compIdHex} 0x00 [FF FF FF]`);
+    }
+
+    function updateBandMode() {
+      let b = document.getElementById("bandSel").value;
+      let t1 = document.getElementById("t1");
+      let t3 = document.getElementById("t3");
+      let r40 = document.getElementById("rel_40m");
+      let r20 = document.getElementById("rel_20m");
+      let r10 = document.getElementById("rel_10m");
+
+      r40.className = "relay-status status-off"; r40.innerText = "IDLE";
+      r20.className = "relay-status status-off"; r20.innerText = "IDLE";
+      r10.className = "relay-status status-off"; r10.innerText = "IDLE";
+
+      if (b === "20m") {
+        t1.innerText = "WSPR 20m 14.097100";
+        t3.innerText = "LPF: 20m [RELAY ON]";
+        r20.className = "relay-status status-on"; r20.innerText = "ACTIVE";
+      } else if (b === "40m") {
+        t1.innerText = "FT8 40m 7.074000";
+        t3.innerText = "LPF: 40m [RELAY ON]";
+        r40.className = "relay-status status-on"; r40.innerText = "ACTIVE";
+      } else if (b === "10m") {
+        t1.innerText = "WSPR 10m 28.126100";
+        t3.innerText = "LPF: 10m [RELAY ON]";
+        r10.className = "relay-status status-on"; r10.innerText = "ACTIVE";
+      }
+      log(`[Arduino -> Display] t1.txt="${t1.innerText}" [FF FF FF]`);
+      log(`[Arduino -> Display] t3.txt="${t3.innerText}" [FF FF FF]`);
+    }
+
+    function sendLine2() {
+      let val = document.getElementById("swrIn").value;
+      document.getElementById("t2").innerText = val;
+      log(`[Arduino -> Display] t2.txt="${val}" [FF FF FF]`);
+    }
+
+    function testSWRBridge() {
+      let r = document.getElementById("rel_swr");
+      r.className = "relay-status status-on";
+      r.innerText = "INLINE";
+      log("[Arduino -> Relay] Pin D4 LOW -> SWR Bridge Energized (INLINE)");
+      setTimeout(() => {
+        r.className = "relay-status status-off";
+        r.innerText = "BYPASSED";
+        log("[Arduino -> Relay] Pin D4 HIGH -> SWR Bridge De-energized (BYPASS)");
+      }, 2000);
+    }
+
+    // Live clock update
+    setInterval(() => {
+      let now = new Date();
+      let utcStr = now.toISOString().substr(11, 8) + " UTC GPS LOCKED";
+      document.getElementById("t0").innerText = utcStr;
+      let sec = now.getSeconds();
+      let prog = (sec % 30) / 30 * 100;
+      document.getElementById("j0").style.width = prog + "%";
+    }, 1000);
+  </script>
+</body>
+</html>

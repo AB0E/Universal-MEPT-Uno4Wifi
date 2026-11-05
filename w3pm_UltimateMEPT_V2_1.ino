@@ -38,35 +38,37 @@
   The code was sucessfully compiled using Arduino 1.8.14
 
 
-  IMPORTANT NOTE: The Arduino Nano 33 IoT is a 3.3V device. Refer to Arduino
-                set up instructions prior to use with this sketch.
-
-
+  MODIFIED FOR:
+  - Arduino UNO R4 WiFi (Renesas RA4M1, WiFiS3, built-in EEPROM & RTC)
+  - Nextion 2.8" / 2.4" UART Touch Display (NX3224T024 / NX3224T028) on Serial1 (D0/D1)
+  - Relay-switched SWR bridge during ANT TUNE (D4)
+  - Relay-switched Lowpass Filter (LPF) bank for 40m (D5), 20m (D6), and 10m (D7)
+  - Callsign: AB0E | Grid Square: EM28
 
   ------------------------------------------------------------------------
-  Nano Digital Pin Allocations follow:
+  Arduino UNO R4 WiFi Pin Allocations:
   ------------------------------------------------------------------------
-  D0/RX
-  D1
-  D2
-  D3
-  D4
-  D5
-  D6  pushButton 1
-  D7  pushButton 2
-  D8  pushButton 3
-  D9  pushButton 4
-  D10 MENU
-  D11
-  D12
-  D13
+  D0/RX0 Nextion Display TX (Blue wire) - Hardware Serial1 RX
+  D1/TX0 Nextion Display RX (Yellow wire) - Hardware Serial1 TX
+  D2     DS3231 RTC 1PPS Interrupt Input (InterruptPin)
+  D3     External CW Keying Socket (extCWsocket)
+  D4     SWR Bridge Relay Output (SWR_RELAY_PIN: energized only during ANT TUNE)
+  D5     40m Lowpass Filter Relay Output (LPF_40M_PIN: <= 7.5 MHz)
+  D6     20m Lowpass Filter Relay Output (LPF_20M_PIN: 7.5 - 15.0 MHz)
+  D7     10m Lowpass Filter Relay Output (LPF_10M_PIN: > 15.0 MHz)
+  D8     Optional GPS RX (SoftwareSerial RX from GPS TX)
+  D9     Optional GPS TX (SoftwareSerial TX to GPS RX)
+  D10    Unused / Spare
+  D11    Unused / Spare
+  D12    Unused / Spare
+  D13    Onboard LED (CW / FSK monitor)
 
-  A0/D14 XmitLED/PTT/external CW keying
-  A1/D15
-  A2/D16
-  A3/D17
-  A4/D18 Si5351, OLED, DS3231 SDA
-  A5/D19 Si5351, OLED, DS3231 SCL
+  A0/D14 XmitLED / PTT / external CW keying
+  A1/D15 MinLED
+  A2/D16 SecLED
+  A3/D17 SWR Bridge Analog Detector Input
+  A4/D18 Si5351A & DS3231 I2C SDA
+  A5/D19 Si5351A & DS3231 I2C SCL
 
 
   ---------------------------------------------------------------------------------------------------------------
@@ -135,8 +137,8 @@ int keyIndex = 0;           // Network key Index number (needed only for WEP)
 // Enter your callsign below:
 // Note: Upper or lower case characters are acceptable. Compound callsigns e.g. W3PM/4 W4/GM4YRE
 //       are supported.
-char call2[12] = "wz9xyz";
-char locator[8] = "fn21";
+char call2[12] = "AB0E";
+char locator[8] = "EM28";
 
 // Enter TX power in dBm below: (e.g. 0 = 1 mW, 10 = 10 mW, 20 = 100 mw, 30 = 1 W)
 // Min = 0 dBm, Max = 43 dBm, steps 0,3,7,10,13,17,20,23,27,30,33,37,40,43
@@ -173,13 +175,13 @@ const int CWwpm = 8;
 const int CWoffset = 600;
 
 // Enter CW message - NOTE: All capital letters. Do NOT use punctuation or special characters:
-char CWmessage[] = " WZ9XYZ AB55 ";
+char CWmessage[] = " AB0E EM28 ";
 
 // Enter FSK offset in Hz:
 const int FSKoffset = 5;
 
 // Enter FSK message - end with period:
-char FSKmessage[] = " WZ9XYZ AA00 ";
+char FSKmessage[] = " AB0E EM28 ";
 
 // Enter FSK dit length in seconds:
 int FSKditDelay = 3;
@@ -322,38 +324,23 @@ const int schedule_2 [][3] = { // 10, 15, and 20m WSPR
   (-1, -1, -1),
 };
 
-const int schedule_3 [][3] = { // WSPR babd hopping 10 - 40m
-  {0, 1, 8},
-  {2, 1, 9},
-  {4, 1, 10},
-  {6, 1, 8},
-  {8, 1, 9},
-  {10, 1, 10},
-  {12, 1, 11},
-  {14, 1, 12},
-  {16, 1, 13},
-  {18, 1, 14},
-  {20, 1, 8},
-  {22, 1, 9},
-  {24, 1, 10},
-  {26, 1, 8},
-  {28, 1, 9},
-  {30, 1, 10},
-  {32, 1, 11},
-  {34, 1, 12},
-  {36, 1, 13},
-  {38, 1, 14},
-  {40, 1, 8},
-  {42, 1, 9},
-  {44, 1, 10},
-  {46, 1, 8},
-  {48, 1, 9},
-  {50, 1, 10},
-  {52, 1, 11},
-  {54, 1, 12},
-  {56, 1, 13},
-  {58, 1, 14},
-  (-1, -1, -1),
+const int schedule_3 [][3] = { // WSPR band hopping for 40m (Band 8), 20m (Band 10), and 10m (Band 14) LPF relays
+  {0, 1, 8},   // 40m WSPR (7038.6 kHz)
+  {4, 1, 10},  // 20m WSPR (14095.6 kHz)
+  {8, 1, 14},  // 10m WSPR (28124.6 kHz)
+  {12, 1, 8},  // 40m WSPR
+  {16, 1, 10}, // 20m WSPR
+  {20, 1, 14}, // 10m WSPR
+  {24, 1, 8},  // 40m WSPR
+  {28, 1, 10}, // 20m WSPR
+  {32, 1, 14}, // 10m WSPR
+  {36, 1, 8},  // 40m WSPR
+  {40, 1, 10}, // 20m WSPR
+  {44, 1, 14}, // 10m WSPR
+  {48, 1, 8},  // 40m WSPR
+  {52, 1, 10}, // 20m WSPR
+  {56, 1, 14}, // 10m WSPR
+  {-1, -1, -1},
 };
 
 const unsigned long TXdialFreq [] =
@@ -391,14 +378,14 @@ const unsigned long TXdialFreq [] =
     Open Windows Command Prompt. Navigate to directory C:\WSJTX\bin>. Enter the folling command
     using your own callsign, grid squate , and power level(dBM) enclosed in quotes as follows:
 
-    fst4sim "WZ9ZZZ FN21 30" 120 1500 0.0 0.1 1.0 0 99 F > FST4W_message.txt"
+    fst4sim "AB0E EM28 7" 120 1500 0.0 0.1 1.0 0 99 F > FST4W_message.txt
 
     This will create a file named "FST4W_message.txt" in C:\WSJTX\bin. Open the "FST4W_message.txt"
     file into a text editor. Separate the "Channel symbols:" data with commas. Replace the following
     data with the comma separated data:
   ----------------------------------------------------------------------------------------------------
 */
-// Load FST4W channel symbols for WZ9ZZZ FN21 30dBm
+// FST4W-120 channel symbols for AB0E EM28 7dBm (Generated via WSJT-X fst4sim CLI)
 const int  FST4Wsymbols[160] = {
   0, 1, 3, 2, 1, 0, 2, 3, 2, 3,
   3, 2, 3, 2, 3, 3, 0, 3, 1, 1,
@@ -424,23 +411,45 @@ const int  FST4Wsymbols[160] = {
     Open Windows Command Prompt. Navigate to directory C:\WSJTX\bin>. Enter the folling command
     using your own callsign and grid squre enclosed in quotes as follows:
 
-    ft8code "CQ WZ9ZZZ AA99"  > FT8_message.txt"
+    ft8code "CQ AB0E EM28" > FT8_message.txt
 
     This will create a file named "FT8_message.txt" in C:\WSJTX\bin. Open the "FST4W_message.txt"
     file into a text editor. Separate the "Channel symbols:" data with commas. Replace the following
     data with the comma separated data:
   ----------------------------------------------------------------------------------------------------
 */
-// Load FT8 channel symbols for "CQ WZ9ZZZ AA99"
+// Load FT8 channel symbols for "CQ AB0E EM28" (verified standard 77-bit payload + CRC-14 + LDPC(174,91) + Costas sync)
 const int FT8symbols[79] = {
   3, 1, 4, 0, 6, 5, 2, 0, 0, 0,
-  0, 0, 0, 0, 0, 1, 1, 4, 6, 4,
-  7, 3, 1, 1, 3, 7, 0, 0, 0, 2,
-  0, 4, 3, 2, 1, 7, 3, 1, 4, 0,
-  6, 5, 2, 0, 5, 7, 5, 1, 4, 0,
-  7, 1, 7, 0, 0, 7, 4, 3, 5, 7,
-  3, 0, 5, 4, 7, 4, 1, 7, 2, 0,
-  0, 7, 3, 1, 4, 0, 6, 5, 2
+  0, 0, 0, 0, 0, 1, 0, 6, 1, 1,
+  2, 4, 4, 0, 3, 7, 0, 5, 0, 7,
+  2, 0, 3, 0, 0, 3, 3, 1, 4, 0,
+  6, 5, 2, 0, 4, 0, 6, 3, 2, 6,
+  2, 0, 5, 5, 3, 0, 1, 6, 3, 1,
+  3, 3, 4, 2, 1, 0, 5, 2, 1, 2,
+  5, 0, 3, 1, 4, 0, 6, 5, 2
+};
+
+// Verified WSPR channel symbols for AB0E EM28 7dBm
+// (Note: The sketch dynamically computes and transmits these via wsprGenCode() into sym[162])
+const int WSPRsymbols[162] = {
+  1, 3, 0, 0, 0, 2, 0, 0, 3, 0,
+  0, 0, 1, 1, 1, 0, 0, 2, 1, 2,
+  0, 3, 0, 1, 3, 1, 3, 0, 0, 2,
+  2, 2, 2, 0, 1, 2, 2, 1, 0, 3,
+  0, 2, 2, 0, 0, 2, 3, 0, 1, 3,
+  2, 0, 3, 1, 0, 3, 0, 0, 0, 3,
+  1, 2, 1, 2, 2, 0, 0, 1, 3, 0,
+  3, 2, 3, 0, 3, 2, 3, 2, 2, 3,
+  0, 2, 3, 0, 3, 1, 0, 0, 0, 3,
+  1, 2, 3, 2, 3, 0, 2, 0, 1, 2,
+  0, 0, 0, 0, 3, 2, 2, 1, 2, 0,
+  1, 3, 1, 0, 3, 1, 0, 2, 3, 3,
+  0, 3, 0, 2, 2, 3, 1, 3, 0, 0,
+  2, 0, 0, 3, 2, 1, 0, 2, 1, 3,
+  0, 2, 0, 2, 2, 2, 0, 1, 3, 0,
+  1, 0, 1, 1, 2, 0, 0, 1, 1, 0,
+  0, 0
 };
 
 
@@ -456,28 +465,273 @@ const int FT8symbols[79] = {
 #include <Arduino.h>
 #include <SPI.h>
 #include <Wire.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
-#include <FlashStorage_SAMD.h>
-#include <WiFiNINA.h>
-//#include <WiFiUdp.h>
-#include <RTCZero.h>
+#include <EEPROM.h>
+#include <WiFiS3.h>
+#include <WiFiUdp.h>
+#include <RTC.h>
+#include <SoftwareSerial.h>
 #include <TinyGPS++.h>
 #include <NTPClient.h>
 #include <TimeLib.h>
 
-// Object for Real Time Clock
-RTCZero rtc;
+// pgm_read_byte compatibility for Renesas RA4M1 (Uno R4 WiFi)
+#ifndef pgm_read_byte
+#define pgm_read_byte(addr) (*(const unsigned char *)(addr))
+#endif
 
 int status = WL_IDLE_STATUS;
 
-#define SCREEN_WIDTH 128 // display display width, in pixels
-#define SCREEN_HEIGHT 64 // display display height, in pixels
+//----------------------------------------------------------------------------------------------------
+// Relay Pin Definitions: ELEGOO 8-Channel DC 5V Relay Module with Optocoupler (Active-LOW)
+//----------------------------------------------------------------------------------------------------
+// The ELEGOO 8-channel module includes onboard optocouplers, transistor drivers, flyback diodes,
+// and status LEDs. Pulling an INx pin LOW (0V) energizes that relay; setting it HIGH (+5V) turns it OFF.
+//
+// Recommended 8-Channel Relay Allocation:
+//   - IN1 (Relay K1)       <- D4 (SWR_RELAY_PIN) : Switches resistive SWR bridge inline during ANT TUNE
+//   - IN2 & IN3 (K2 & K3)  <- D5 (LPF_40M_PIN)   : 40m LPF Input (K2) & Output (K3) relays (<= 7.5 MHz)
+//   - IN4 & IN5 (K4 & K5)  <- D6 (LPF_20M_PIN)   : 20m LPF Input (K4) & Output (K5) relays (7.5 - 15.0 MHz)
+//   - IN6 & IN7 (K6 & K7)  <- D7 (LPF_10M_PIN)   : 10m LPF Input (K6) & Output (K7) relays (> 15.0 MHz)
+//   - IN8 (Relay K8)       <- Spare (or optional second pole for SWR bridge bypass)
+#define SWR_RELAY_PIN      4   // LOW during ANT TUNE to energize SWR bridge relay (IN1)
+#define LPF_40M_PIN        5   // LOW for 40m Lowpass Filter relay (IN2 / IN3, <= 7.5 MHz)
+#define LPF_20M_PIN        6   // LOW for 20m Lowpass Filter relay (IN4 / IN5, 7.5 - 15.0 MHz)
+#define LPF_10M_PIN        7   // LOW for 10m Lowpass Filter relay (IN6 / IN7, > 15.0 MHz)
 
-#define OLED_RESET -1 // Reset pin # (or -1 if sharing Arduino reset pin)
-//#define SCREEN_ADDRESS 0x3D ///< See datasheet for Address; 0x3D for 128x64 7 pin, 0x3C for 4 pin OLED
-#define SCREEN_ADDRESS 0x3C ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 4 pin OLED
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+// Active-LOW (true) for ELEGOO 8-Channel Optocoupler Relay Module (LOW = Relay ON, HIGH = Relay OFF)
+#define RELAY_ACTIVE_LOW   true
+#define RELAY_ON           (RELAY_ACTIVE_LOW ? LOW : HIGH)
+#define RELAY_OFF          (RELAY_ACTIVE_LOW ? HIGH : LOW)
+
+//----------------------------------------------------------------------------------------------------
+// Nextion NX3224T024 / NX3224T028 UART Display & Optional GPS Serial Configuration
+//----------------------------------------------------------------------------------------------------
+// Nextion display connects to Hardware Serial1 (D0 = RX, D1 = TX)
+#define NEXTION_SERIAL     Serial1
+#define NEXTION_BAUD       9600
+
+// Optional GPS module connects via SoftwareSerial on D8 (RX) and D9 (TX) so Serial1 stays dedicated to Nextion
+#define GPS_RX_PIN         8
+#define GPS_TX_PIN         9
+SoftwareSerial gpsSerial(GPS_RX_PIN, GPS_TX_PIN);
+
+#define SSD1306_WHITE      65535
+#define BLACK              0
+#define SSD1306_SWITCHCAPVCC 0
+#define SCREEN_ADDRESS     0x3C
+
+// Virtual button IDs used internally by touchReadButton()
+#define VBTN_PB1           101
+#define VBTN_PB2           102
+#define VBTN_PB3           103
+#define VBTN_PB4           104
+#define VBTN_MENU          105
+
+//----------------------------------------------------------------------------------------------------
+// Nextion UART Display Adapter (320x240 Landscape)
+// Supports BOTH:
+//   1. Component-based Nextion HMI files with text boxes t0, t1, t2, t3 (4 lines) and buttons b0..b5
+//   2. Direct Nextion GUI drawing commands (cls, fill, draw, xstr) + raw touch coordinates (sendxy=1)
+//----------------------------------------------------------------------------------------------------
+class NextionDisplayAdapter {
+public:
+  char lineBuf[4][24];
+  char sentBuf[4][24];
+  int curRow = 0;
+  int curCol = 0;
+  uint8_t textSize = 2;
+  bool dirty = false;
+
+  void sendCmd(const char* cmd) {
+    NEXTION_SERIAL.print(cmd);
+    NEXTION_SERIAL.write(0xFF);
+    NEXTION_SERIAL.write(0xFF);
+    NEXTION_SERIAL.write(0xFF);
+  }
+
+  bool begin(uint8_t vcs = 0, uint8_t addr = 0) {
+    NEXTION_SERIAL.begin(NEXTION_BAUD);
+    delay(100);
+    sendCmd("");          // Clear any pending serial garbage
+    sendCmd("bkcmd=0");   // Disable Nextion command-ack responses so RX only carries touch events
+    sendCmd("sendxy=1");  // Enable raw (X, Y) touch coordinate events (0x67) in addition to component events (0x65)
+    clearDisplay();
+    drawTouchKeypad();
+    display();
+    return true;
+  }
+
+  void clearDisplay() {
+    for (int r = 0; r < 4; r++) {
+      memset(lineBuf[r], ' ', 20);
+      lineBuf[r][20] = '\0';
+      sentBuf[r][0] = '\0'; // Force refresh on next display()
+    }
+    curRow = 0;
+    curCol = 0;
+    dirty = true;
+  }
+
+  void setTextSize(uint8_t s) {
+    textSize = s;
+  }
+
+  void setTextColor(uint16_t fg, uint16_t bg = 0) {}
+
+  void setCursor(int16_t x, int16_t y) {
+    // Map original 128x64 OLED coordinates to 4 character rows (0..3) and columns (0..19)
+    if (y < 12) curRow = 0;
+    else if (y < 26) curRow = 1;
+    else if (y < 40) curRow = 2;
+    else curRow = 3;
+
+    if (textSize == 1) curCol = x / 6;
+    else curCol = x / 12;
+    if (curCol < 0) curCol = 0;
+    if (curCol > 19) curCol = 19;
+  }
+
+  void writeChars(const char* str) {
+    if (!str) return;
+    while (*str) {
+      if (*str == '\n') {
+        curRow++;
+        curCol = 0;
+        if (curRow > 3) curRow = 3;
+      } else if (*str != '\r') {
+        if (curRow >= 0 && curRow < 4 && curCol >= 0 && curCol < 20) {
+          lineBuf[curRow][curCol] = *str;
+          curCol++;
+          dirty = true;
+        }
+      }
+      str++;
+    }
+  }
+
+  size_t print(const __FlashStringHelper* ifsh) {
+    PGM_P p = reinterpret_cast<PGM_P>(ifsh);
+    char buf[32];
+    strncpy_P(buf, p, sizeof(buf) - 1);
+    buf[sizeof(buf) - 1] = '\0';
+    writeChars(buf);
+    return strlen(buf);
+  }
+
+  size_t print(const String& s) {
+    writeChars(s.c_str());
+    return s.length();
+  }
+
+  size_t print(const char* s) {
+    writeChars(s);
+    return strlen(s);
+  }
+
+  size_t print(char c) {
+    char buf[2] = {c, '\0'};
+    writeChars(buf);
+    return 1;
+  }
+
+  size_t print(long val) {
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%ld", val);
+    writeChars(buf);
+    return strlen(buf);
+  }
+
+  size_t print(unsigned long val) {
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%lu", val);
+    writeChars(buf);
+    return strlen(buf);
+  }
+
+  size_t print(int val) { return print((long)val); }
+  size_t print(unsigned int val) { return print((unsigned long)val); }
+  size_t print(byte val) { return print((unsigned long)val); }
+
+  size_t print(double val, int digits = 2) {
+    char buf[20];
+    snprintf(buf, sizeof(buf), "%.*f", digits, val);
+    writeChars(buf);
+    return strlen(buf);
+  }
+
+  size_t print(IPAddress ip) {
+    char buf[20];
+    snprintf(buf, sizeof(buf), "%u.%u.%u.%u", ip[0], ip[1], ip[2], ip[3]);
+    writeChars(buf);
+    return strlen(buf);
+  }
+
+  template <typename T>
+  size_t println(T val) {
+    size_t n = print(val);
+    writeChars("\n");
+    return n + 1;
+  }
+
+  size_t println() {
+    writeChars("\n");
+    return 1;
+  }
+
+  void trimRight(char* out, const char* in) {
+    strcpy(out, in);
+    int len = strlen(out);
+    while (len > 0 && out[len - 1] == ' ') {
+      out[len - 1] = '\0';
+      len--;
+    }
+  }
+
+  void display() {
+    if (!dirty) return;
+    char cmd[80];
+    char cleanLine[24];
+    for (int r = 0; r < 4; r++) {
+      if (strcmp(lineBuf[r], sentBuf[r]) != 0) {
+        strcpy(sentBuf[r], lineBuf[r]);
+        trimRight(cleanLine, lineBuf[r]);
+        // 1. Update Nextion Text Component t0..t3 (if defined in HMI)
+        snprintf(cmd, sizeof(cmd), "t%d.txt=\"%s\"", r, cleanLine);
+        sendCmd(cmd);
+        // 2. Also draw via xstr on the upper 320x144 status area (works with any HMI containing Font 0)
+        int yPos = 6 + r * 34;
+        snprintf(cmd, sizeof(cmd), "xstr 8,%d,304,32,0,65535,31,0,1,1,\"%s\"", yPos, cleanLine);
+        sendCmd(cmd);
+      }
+    }
+    dirty = false;
+  }
+
+  void drawTouchKeypad() {
+    // Draw 6-button bar in lower 320x96 area of the 320x240 Nextion display
+    sendCmd("cls 31"); // Navy background (RGB565 = 31)
+    sendCmd("draw 0,145,319,145,65535");
+    const char* labels[6] = {"PB1  -", "PB2 SEL", "PB3 NXT", "PB4  +", "SAVE 2+3", "MENU"};
+    const uint16_t colors[6] = {10597, 7327, 10597, 10597, 1504, 51200};
+    char cmd[80];
+    for (int idx = 0; idx < 6; idx++) {
+      int col = idx % 3;
+      int row = idx / 3;
+      int bx = 4 + col * 105;
+      int by = 149 + row * 45;
+      int bw = 102;
+      int bh = 41;
+      snprintf(cmd, sizeof(cmd), "fill %d,%d,%d,%d,%u", bx, by, bw, bh, colors[idx]);
+      sendCmd(cmd);
+      snprintf(cmd, sizeof(cmd), "draw %d,%d,%d,%d,65535", bx, by, bx + bw, by + bh);
+      sendCmd(cmd);
+      snprintf(cmd, sizeof(cmd), "xstr %d,%d,%d,%d,0,65535,%u,1,1,1,\"%s\"", bx + 2, by + 2, bw - 4, bh - 4, colors[idx], labels[idx]);
+      sendCmd(cmd);
+    }
+  }
+};
+
+NextionDisplayAdapter display;
 
 // Set DS3231 I2C address
 #define DS3231_addr           0x68
@@ -597,19 +851,14 @@ const byte Morse[38] = {
 // Set up MCU pins
 #define InterruptPin             2
 #define extCWsocket              3
-#define CFup                     7
-#define CFdown                   6
-#define calibrate                9
-#define endCalibrate             8
-//#define NanoLED                 13
 #define XmitLED                 14
 #define MinLED                  15
 #define SecLED                  16
-#define pushButton1              6
-#define pushButton2              7
-#define pushButton3              8
-#define pushButton4              9
-#define menu                    10
+#define pushButton1              VBTN_PB1
+#define pushButton2              VBTN_PB2
+#define pushButton3              VBTN_PB3
+#define pushButton4              VBTN_PB4
+#define menu                     VBTN_MENU
 
 // Set sI5351A I2C address
 #define Si5351A_addr          0x60
@@ -672,6 +921,117 @@ int dLon1, dLon2, dLat1, dLat2, dlon, sat1, sat10;
 
 
 
+
+//***********************************************************************
+// Lowpass Filter (LPF) & SWR Bridge Relay Control Functions
+//***********************************************************************
+int currentLPF = -1;
+
+void selectBandLPF(unsigned long freqHz) {
+  int targetLPF = 0;
+  if (freqHz <= 7500000UL) {
+    targetLPF = 40; // 40m LPF (<= 7.5 MHz, e.g., 7038.6 kHz)
+  } else if (freqHz <= 15000000UL) {
+    targetLPF = 20; // 20m LPF (7.5 - 15.0 MHz, e.g., 14095.6 kHz)
+  } else {
+    targetLPF = 10; // 10m LPF (> 15.0 MHz, e.g., 28124.6 kHz)
+  }
+
+  if (targetLPF != currentLPF) {
+    // Break-before-make switching across the 3 LPF relays
+    digitalWrite(LPF_40M_PIN, RELAY_OFF);
+    digitalWrite(LPF_20M_PIN, RELAY_OFF);
+    digitalWrite(LPF_10M_PIN, RELAY_OFF);
+    if (targetLPF == 40) digitalWrite(LPF_40M_PIN, RELAY_ON);
+    else if (targetLPF == 20) digitalWrite(LPF_20M_PIN, RELAY_ON);
+    else if (targetLPF == 10) digitalWrite(LPF_10M_PIN, RELAY_ON);
+    currentLPF = targetLPF;
+  }
+}
+
+void setSWRRelay(bool enableBridge) {
+  digitalWrite(SWR_RELAY_PIN, enableBridge ? RELAY_ON : RELAY_OFF);
+}
+
+//***********************************************************************
+// Nextion UART Touch Parser
+// Decodes both:
+//   - 0x65 Component Touch Events (Page, ComponentID, Press/Release, FF FF FF)
+//   - 0x67 Raw Coordinate Touch Events (X_msb, X_lsb, Y_msb, Y_lsb, Press/Release, FF FF FF)
+//   - Single-byte ASCII button shortcuts ('1','2','3','4','S','M')
+//***********************************************************************
+int activeTouchBtn = -1; // -1 = none, 0 = PB1, 1 = PB2, 2 = PB3, 3 = PB4, 4 = SAVE(2+3), 5 = MENU
+unsigned long lastTouchTime = 0;
+
+void pollNextionTouch() {
+  while (NEXTION_SERIAL.available() > 0) {
+    uint8_t b = NEXTION_SERIAL.read();
+
+    if (b == 0x65) {
+      // Standard Nextion Component Touch Event: 0x65 <page> <id> <event> 0xFF 0xFF 0xFF
+      unsigned long t0 = millis();
+      while (NEXTION_SERIAL.available() < 6 && (millis() - t0) < 30) {}
+      if (NEXTION_SERIAL.available() >= 6) {
+        uint8_t page = NEXTION_SERIAL.read();
+        uint8_t compId = NEXTION_SERIAL.read();
+        uint8_t evt = NEXTION_SERIAL.read();
+        NEXTION_SERIAL.read(); NEXTION_SERIAL.read(); NEXTION_SERIAL.read(); // 3x 0xFF
+        (void)page;
+        if (evt == 0x01) { // Touch Press
+          // Map component IDs 1..6 (or 0..5) to buttons 0..5
+          if (compId >= 1 && compId <= 6) activeTouchBtn = compId - 1;
+          else if (compId <= 5) activeTouchBtn = compId;
+          lastTouchTime = millis();
+        } else {
+          activeTouchBtn = -1;
+        }
+      }
+    } else if (b == 0x67) {
+      // Raw Coordinate Touch Event (sendxy=1): 0x67 <xH> <xL> <yH> <yL> <event> 0xFF 0xFF 0xFF
+      unsigned long t0 = millis();
+      while (NEXTION_SERIAL.available() < 8 && (millis() - t0) < 30) {}
+      if (NEXTION_SERIAL.available() >= 8) {
+        uint16_t tx = ((uint16_t)NEXTION_SERIAL.read() << 8) | NEXTION_SERIAL.read();
+        uint16_t ty = ((uint16_t)NEXTION_SERIAL.read() << 8) | NEXTION_SERIAL.read();
+        uint8_t evt = NEXTION_SERIAL.read();
+        NEXTION_SERIAL.read(); NEXTION_SERIAL.read(); NEXTION_SERIAL.read(); // 3x 0xFF
+        if (evt == 0x01 && ty >= 145 && tx < 320) {
+          int col = tx / 107;
+          if (col > 2) col = 2;
+          int row = (ty < 194) ? 0 : 1;
+          activeTouchBtn = row * 3 + col;
+          lastTouchTime = millis();
+        } else if (evt == 0x00) {
+          activeTouchBtn = -1;
+        }
+      }
+    } else if (b == '1') { activeTouchBtn = 0; lastTouchTime = millis(); }
+      else if (b == '2') { activeTouchBtn = 1; lastTouchTime = millis(); }
+      else if (b == '3') { activeTouchBtn = 2; lastTouchTime = millis(); }
+      else if (b == '4') { activeTouchBtn = 3; lastTouchTime = millis(); }
+      else if (b == 'S' || b == 's') { activeTouchBtn = 4; lastTouchTime = millis(); }
+      else if (b == 'M' || b == 'm') { activeTouchBtn = 5; lastTouchTime = millis(); }
+  }
+
+  // Auto-release momentary touch after 250 ms if no release packet was received
+  if (activeTouchBtn != -1 && (millis() - lastTouchTime) > 250) {
+    activeTouchBtn = -1;
+  }
+}
+
+int touchReadButton(uint8_t pin) {
+  pollNextionTouch();
+  if (activeTouchBtn == -1) return HIGH;
+
+  if (activeTouchBtn == 0 && pin == pushButton1) return LOW;
+  if (activeTouchBtn == 1 && pin == pushButton2) return LOW;
+  if (activeTouchBtn == 2 && pin == pushButton3) return LOW;
+  if (activeTouchBtn == 3 && pin == pushButton4) return LOW;
+  if (activeTouchBtn == 4 && (pin == pushButton2 || pin == pushButton3)) return LOW;
+  if (activeTouchBtn == 5 && pin == menu) return LOW;
+
+  return HIGH;
+}
 
 //***********************************************************************
 // This interrupt is used Nano 33 IoT millisecond calibration
@@ -936,7 +1296,7 @@ void setup() {
   delay(2000);
 
   Serial.begin(115200);
-  Serial1.begin(GPSBaud);
+  gpsSerial.begin(GPSBaud);
 
   Wire.begin();                                 // join I2C bus
 
@@ -966,17 +1326,18 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(InterruptPin), Interrupt, FALLING);
 
 
-  // Set up push buttons
-  pinMode(pushButton1, INPUT);
-  digitalWrite(pushButton1, HIGH);      // internal pull-up enabled
-  pinMode(pushButton2, INPUT);
-  digitalWrite(pushButton2, HIGH);      // internal pull-up enabled
-  pinMode(pushButton3, INPUT);
-  digitalWrite(pushButton3, HIGH);      // internal pull-up enabled
-  pinMode(pushButton4, INPUT);
-  digitalWrite(pushButton4, HIGH);      // internal pull-up enabled
-  pinMode(menu, INPUT);
-  digitalWrite(menu, HIGH);             // internal pull-up enabled
+  // Set up SWR bridge relay and 40m / 20m / 10m Lowpass Filter relays
+  // Pre-load HIGH (RELAY_OFF) before setting OUTPUT so Active-LOW relays do not chatter at power-up
+  digitalWrite(SWR_RELAY_PIN, RELAY_OFF);
+  digitalWrite(LPF_40M_PIN, RELAY_OFF);
+  digitalWrite(LPF_20M_PIN, RELAY_OFF);
+  digitalWrite(LPF_10M_PIN, RELAY_OFF);
+  pinMode(SWR_RELAY_PIN, OUTPUT);
+  pinMode(LPF_40M_PIN, OUTPUT);
+  pinMode(LPF_20M_PIN, OUTPUT);
+  pinMode(LPF_10M_PIN, OUTPUT);
+
+  // Set up external CW keying socket
   pinMode(extCWsocket, INPUT);
   digitalWrite(extCWsocket, HIGH);      // internal pull-up enabled
 
@@ -1086,7 +1447,8 @@ void setup() {
   display.setTextSize(2); // Draw 2X-scale text
   display.setTextColor(SSD1306_WHITE, BLACK);
 
-  rtc.begin();
+  RTC.begin();
+  selectBandLPF(TXdialFreq[TXband]);
 
   timeClient.begin();
 
@@ -1122,9 +1484,9 @@ void loop() {
         display.clearDisplay();
         doOneTimeTrigger = false; // timed out exit default to RTC
       }
-    }while (doOneTimeTrigger == true & digitalRead(pushButton1 == HIGH) & digitalRead(pushButton2 == HIGH) & digitalRead(pushButton3 == HIGH));
+    }while (doOneTimeTrigger == true && touchReadButton(pushButton1) == HIGH && touchReadButton(pushButton2) == HIGH && touchReadButton(pushButton3) == HIGH);
 
-    if (digitalRead(pushButton1) == LOW)
+    if (touchReadButton(pushButton1) == LOW)
     {
       display.clearDisplay();
       display.setCursor(0, 0);
@@ -1161,7 +1523,7 @@ void loop() {
       }
     }
 
-    if (digitalRead(pushButton2) == LOW)
+    if (touchReadButton(pushButton2) == LOW)
     {
       display.clearDisplay();
       display.setCursor(0, 0);
@@ -1169,8 +1531,8 @@ void loop() {
       display.display();
       for (int i = 120; i > 0; i--)
       {
-        while (Serial1.available() > 0)
-        if (gps.encode(Serial1.read())) SetGPStime();
+        while (gpsSerial.available() > 0)
+        if (gps.encode(gpsSerial.read())) SetGPStime();
         display.setCursor(0, 16);
         if (GPS_hours < 10) display.print(F("0"));
         display.print(GPS_hours);
@@ -1221,10 +1583,11 @@ void loop() {
       }
     }
 
-    if (digitalRead(pushButton3) == LOW)
+    if (touchReadButton(pushButton3) == LOW)
     {
       // Start Real Time Clock
-      //rtc.begin();
+      //RTC.begin();
+  selectBandLPF(TXdialFreq[TXband]);
       display.clearDisplay();
       //TimeSource[5] = "RTC ";
       doOneTimeTrigger = false;
@@ -1236,16 +1599,16 @@ void loop() {
     // This displays information every time a new sentence is correctly encoded.
     if (GPSselectFlag == true)
     {
-      while (Serial1.available() > 0)
-        if (gps.encode(Serial1.read()))
+      while (gpsSerial.available() > 0)
+        if (gps.encode(gpsSerial.read()))
           SetGPStime();
     }
 
     // Loop through the  menu rota until a selection is made
-    while (digitalRead(pushButton2) == HIGH & startFlag == false)
+    while (touchReadButton(pushButton2) == HIGH & startFlag == false)
     {
-      //if (digitalRead (menu) == LOW) menuFlag = true;
-      if (digitalRead(pushButton3) == LOW | (digitalRead (menu) == LOW))
+      //if (touchReadButton(menu) == LOW) menuFlag = true;
+      if (touchReadButton(pushButton3) == LOW | (touchReadButton(menu) == LOW))
       {
         altDelay(500);
         startCount = startCount + 1;
@@ -1372,7 +1735,7 @@ void loop() {
      // Selection is made at this point, now go to the selected function
     }
 
-    if (digitalRead (menu) == LOW)
+    if (touchReadButton(menu) == LOW)
     {
       altDelay(300);
       menuFlag = false;
@@ -1450,7 +1813,7 @@ void EditCall()
     display.print(call2);
     display.display();
 
-    if (digitalRead(pushButton1) == LOW)
+    if (touchReadButton(pushButton1) == LOW)
     {
       character++;
       altDelay(300);
@@ -1465,7 +1828,7 @@ void EditCall()
       }
 
     }
-    if (digitalRead(pushButton4) == LOW)
+    if (touchReadButton(pushButton4) == LOW)
     {
       altDelay(300);
       display.setCursor((column * 12), 0);
@@ -1475,7 +1838,7 @@ void EditCall()
       character = call2[column];
       if (column > 10) column = 0;
     }
-    if ((digitalRead(pushButton2) == LOW) & (digitalRead(pushButton3) == LOW))
+    if ((touchReadButton(pushButton2) == LOW) & (touchReadButton(pushButton3) == LOW))
     {
       for (int i = 0; i < 12; i++)
       {
@@ -1549,7 +1912,7 @@ void EditGrid()
     display.print(locator);
     display.display();
 
-    if (digitalRead(pushButton1) == LOW)
+    if (touchReadButton(pushButton1) == LOW)
     {
       altDelay(300);
       character++;
@@ -1563,7 +1926,7 @@ void EditGrid()
       }
 
     }
-    if (digitalRead(pushButton4) == LOW)
+    if (touchReadButton(pushButton4) == LOW)
     {
       altDelay(300);
       display.setCursor((column * 12), 0);
@@ -1573,7 +1936,7 @@ void EditGrid()
       character = locator[column];
       if (column > 7) column = 0;
     }
-    if ((digitalRead(pushButton2) == LOW) & (digitalRead(pushButton3) == LOW))
+    if ((touchReadButton(pushButton2) == LOW) & (touchReadButton(pushButton3) == LOW))
     {
       for (int i = 0; i < 8; i++)
       {
@@ -1679,9 +2042,9 @@ void tinyGPS_calcGridSquare()
     display.print("2:3 - save");
     display.display();
 
-    if (digitalRead(menu) == LOW) doOneTimeTrigger_2 = false;
+    if (touchReadButton(menu) == LOW) doOneTimeTrigger_2 = false;
     altDelay(200);
-    if ((digitalRead(pushButton2) == LOW) & (digitalRead(pushButton3) == LOW))
+    if ((touchReadButton(pushButton2) == LOW) & (touchReadButton(pushButton3) == LOW))
     {
       for (int i = 0; i < 8; i++)
       {
@@ -1753,17 +2116,17 @@ void adjClock()
   display.print(a);
   display.print(b);
 
-  // Display legend
+  // Display single-touch legend
   display.setCursor(0, 16);
-  display.print(F("Hold PB4"));
+  display.print(F("PB1:Hr PB2:Mn"));
   display.setCursor(0, 32);
-  display.print(F("PB1: Hours"));
+  display.print(F("PB4:Zero Sec"));
   display.setCursor(0, 48);
-  display.print(F("PB2: Minutes"));
+  display.print(F("MENU: Exit  "));
   display.display();
 
-  // Start one button time synchronization routine
-  if (digitalRead(pushButton1) == LOW)
+  // PB4 synchronizes seconds to :00 at top of minute
+  if (touchReadButton(pushButton4) == LOW)
   {
     if (tempSecond > 30) tempMinute++;
     if (tempMinute > 59) tempMinute = 0;
@@ -1771,51 +2134,23 @@ void adjClock()
     adjClockTime(tempSecond, tempMinute, tempHour);
     altDelay(500);
   }
-  timeAdjust_toggle = false;
 
-  // Start set time routine
-  while (digitalRead(pushButton4) == LOW)
+  // PB1 increments Hour directly (single-touch friendly)
+  if (touchReadButton(pushButton1) == LOW)
   {
-    if (digitalRead(pushButton1) == LOW)
-    {
-      altDelay(500);
-      tempHour++;
-      if (tempHour > 23) tempHour = 0;
-      timeAdjust_toggle = true;
-    }
-
-    if (digitalRead(pushButton2) == LOW)
-    {
-      altDelay(500);
-      tempMinute++;
-      if (tempMinute > 59) tempMinute = 0;
-      timeAdjust_toggle = true;
-    }
-
-    // Display set time
-    display.setCursor(0, 0);
-    display.print(F("  "));
-    int a = tempHour;
-    int b = a % 10;
-    a = a / 10;
-    display.print(a);
-    display.print(b);
-    display.print(F(":"));
-    a = tempMinute;
-    b = a % 10;
-    a = a / 10;
-    display.print(a);
-    display.print(b);
-    display.print(F(":00"));
-    display.display();
+    tempHour++;
+    if (tempHour > 23) tempHour = 0;
+    adjClockTime(0, tempMinute, tempHour);
+    altDelay(400);
   }
 
-  // Update time if change is made
-  if (timeAdjust_toggle == true)
+  // PB2 increments Minute directly (single-touch friendly)
+  if (touchReadButton(pushButton2) == LOW)
   {
-    int tempSecond = 0;
-    adjClockTime(tempSecond, tempMinute, tempHour);
-    timeAdjust_toggle = false;
+    tempMinute++;
+    if (tempMinute > 59) tempMinute = 0;
+    adjClockTime(0, tempMinute, tempHour);
+    altDelay(400);
   }
 }
 
@@ -1850,53 +2185,39 @@ void setDATE()
   display.print(F(" "));
   display.print(updateYear);
 
-  // Display legend
+  // Display single-touch legend
   display.setCursor(0, 16);
-  display.print(F("Hold PB4"));
+  display.print(F("PB1:Day 2:Mon"));
   display.setCursor(0, 32);
-  display.print(F("1:Date"));
+  display.print(F("PB3:Year"));
   display.setCursor(0, 48);
-  display.print(F("2:Month 3:Yr"));
+  display.print(F("MENU: Exit"));
   display.display();
 
-  // Start update
-  while (digitalRead(pushButton4) == LOW)
+  timeAdjust_toggle = false;
+
+  if (touchReadButton(pushButton1) == LOW)
   {
-    if (digitalRead(pushButton1) == LOW)
-    {
-      altDelay(500);
-      updateDate++;
-      if (updateDate > 31) updateDate = 0;
-      timeAdjust_toggle = true;
-    }
+    updateDate++;
+    if (updateDate > 31) updateDate = 1;
+    timeAdjust_toggle = true;
+    altDelay(400);
+  }
 
-    if (digitalRead(pushButton2) == LOW)
-    {
-      altDelay(500);
-      updateMonth++;
-      if (updateMonth > 12) updateMonth = 1;
-      timeAdjust_toggle = true;
-    }
+  if (touchReadButton(pushButton2) == LOW)
+  {
+    updateMonth++;
+    if (updateMonth > 12) updateMonth = 1;
+    timeAdjust_toggle = true;
+    altDelay(400);
+  }
 
-    if (digitalRead(pushButton3) == LOW)
-    {
-      altDelay(500);
-      updateYear++;
-      if (updateYear > 30) updateYear = 19;
-      timeAdjust_toggle = true;
-    }
-
-    // Display updates
-    display.setCursor(0, 0);
-    //if (xdate < 10) display.print(F("0"));
-    display.print(updateDate);
-    display.print(F(" "));
-    descriptionType oneItem;
-    memcpy_P (&oneItem, &monthOfTheYear [updateMonth - 1], sizeof oneItem);
-    display.print (oneItem.description);
-    display.print(F(" "));
-    display.print(updateYear);
-    display.display();
+  if (touchReadButton(pushButton3) == LOW)
+  {
+    updateYear++;
+    if (updateYear > 35) updateYear = 24;
+    timeAdjust_toggle = true;
+    altDelay(400);
   }
 
   // Save data if updated
@@ -1933,16 +2254,16 @@ void XtalFreqCalibrate()
   Si5351_write(CLK_ENABLE_CONTROL, 0b00000101); // Enable CLK1 - disable CLK0 & CLK2
   si5351aSetFreq(SYNTH_MS_1, 25000000, 0);
   display.clearDisplay();
-  while (digitalRead(menu) == HIGH)
+  while (touchReadButton(menu) == HIGH)
   {
-    if (digitalRead(pushButton3) == LOW)
+    if (touchReadButton(pushButton3) == LOW)
     {
       altDelay(200);
       resolution = resolution * 10L;
       if (resolution > 1000) resolution = 1L;
     }
 
-    if (digitalRead(pushButton4) == LOW)
+    if (touchReadButton(pushButton4) == LOW)
     {
       altDelay(200);
       XtalFreq = XtalFreq - resolution;
@@ -1950,7 +2271,7 @@ void XtalFreqCalibrate()
       si5351aSetFreq(SYNTH_MS_1, 25000000, 0);
     }
 
-    if (digitalRead(pushButton1) == LOW)
+    if (touchReadButton(pushButton1) == LOW)
     {
       altDelay(200);
       XtalFreq = XtalFreq + resolution;
@@ -1971,7 +2292,7 @@ void XtalFreqCalibrate()
     display.print(F("PB3: Res"));
     display.setCursor(0, 48);
     display.print(F("2:3 - save"));
-    if ((digitalRead(pushButton2) == LOW) & (digitalRead(pushButton3) == LOW)) saveEEPROM();
+    if ((touchReadButton(pushButton2) == LOW) & (touchReadButton(pushButton3) == LOW)) saveEEPROM();
     display.display();
   }
   Si5351_write(CLK_ENABLE_CONTROL, 0b00000111); // Disable clocks
@@ -2273,9 +2594,9 @@ void changeBand()
   DisplayText("1&4 - edit", 0, 0);
   DisplayText("menu: exit", 0, 2);
   DisplayText("2:3 - save", 0, 3);
-  if ((digitalRead(pushButton2) == LOW) & (digitalRead(pushButton3) == LOW)) saveEEPROM();
+  if ((touchReadButton(pushButton2) == LOW) & (touchReadButton(pushButton3) == LOW)) saveEEPROM();
 
-  if (digitalRead(pushButton4) == LOW)
+  if (touchReadButton(pushButton4) == LOW)
   {
     altDelay(200);
     TXband++;
@@ -2283,7 +2604,7 @@ void changeBand()
     altDelay(200);
   }
 
-  if (digitalRead(pushButton1) == LOW)
+  if (touchReadButton(pushButton1) == LOW)
   {
     altDelay(200);
     TXband--;
@@ -2306,7 +2627,7 @@ void EditPower()
   //DisplayText("1&4 - edit", 0, 2);
   DisplayText("menu: exit", 0, 2);
   DisplayText("2:3 - save", 0, 3);
-  if ((digitalRead(pushButton2) == LOW) & (digitalRead(pushButton3) == LOW)) saveEEPROM();
+  if ((touchReadButton(pushButton2) == LOW) & (touchReadButton(pushButton3) == LOW)) saveEEPROM();
 
   display.setCursor(0, 0);
   display.print(ndbm);
@@ -2316,7 +2637,7 @@ void EditPower()
   display.print(F(" W"));
   display.display();
 
-  if (digitalRead(pushButton4) == LOW)
+  if (touchReadButton(pushButton4) == LOW)
   {
     altDelay(200);
     display.setCursor(0, 0);
@@ -2327,7 +2648,7 @@ void EditPower()
     ndbm++;
   }
 
-  if (digitalRead(pushButton1) == LOW)
+  if (touchReadButton(pushButton1) == LOW)
   {
     altDelay(200);
     display.setCursor(0, 0);
@@ -2352,12 +2673,12 @@ void EditTXinterval()
   DisplayText("1&4 - edit", 0, 1);
   DisplayText("menu: exit", 0, 2);
   DisplayText("2:3 - save", 0, 3);
-  if ((digitalRead(pushButton2) == LOW) & (digitalRead(pushButton3) == LOW)) saveEEPROM();
+  if ((touchReadButton(pushButton2) == LOW) & (touchReadButton(pushButton3) == LOW)) saveEEPROM();
 
   display.setCursor(0, 0);
   display.print(TXinterval);
 
-  if (digitalRead(pushButton4) == LOW)
+  if (touchReadButton(pushButton4) == LOW)
   {
     altDelay(200);
     display.setCursor(0, 0);
@@ -2367,7 +2688,7 @@ void EditTXinterval()
     TXinterval++;
   }
 
-  if (digitalRead(pushButton1) == LOW)
+  if (touchReadButton(pushButton1) == LOW)
   {
     altDelay(200);
     display.setCursor(0, 0);
@@ -2391,13 +2712,13 @@ void EditTXhop()
   DisplayText("1&4 - edit", 0, 1);
   DisplayText("menu: exit", 0, 2);
   DisplayText("2:3 - save", 0, 3);
-  if ((digitalRead(pushButton2) == LOW) & (digitalRead(pushButton3) == LOW)) saveEEPROM();
+  if ((touchReadButton(pushButton2) == LOW) & (touchReadButton(pushButton3) == LOW)) saveEEPROM();
 
   display.setCursor(0, 0);
   if (FreqHopTX == true) display.print(F("YES"));
   else display.print(F("NO "));
 
-  if (digitalRead(pushButton4) == LOW)
+  if (touchReadButton(pushButton4) == LOW)
   {
     altDelay(200);
     display.setCursor(0, 0);
@@ -2405,7 +2726,7 @@ void EditTXhop()
     FreqHopTX = false;
   }
 
-  if (digitalRead(pushButton1) == LOW)
+  if (touchReadButton(pushButton1) == LOW)
   {
     altDelay(200);
     display.setCursor(0, 0);
@@ -2427,19 +2748,19 @@ void EditTXoffset()
   DisplayText("1&4 - edit", 0, 1);
   DisplayText("menu: exit", 0, 2);
   DisplayText("2:3 - save", 0, 3);
-  if ((digitalRead(pushButton2) == LOW) & (digitalRead(pushButton3) == LOW)) saveEEPROM();
+  if ((touchReadButton(pushButton2) == LOW) & (touchReadButton(pushButton3) == LOW)) saveEEPROM();
 
   display.setCursor(0, 0);
   display.print(TXoffset);
 
-  if (digitalRead(pushButton4) == LOW)
+  if (touchReadButton(pushButton4) == LOW)
   {
     altDelay(200);
     TXoffset++;
     if (TXoffset > 1600UL) TXoffset = 1600UL;
   }
 
-  if (digitalRead(pushButton1) == LOW)
+  if (touchReadButton(pushButton1) == LOW)
   {
     altDelay(200);
     TXoffset--;
@@ -2458,18 +2779,22 @@ void EditTXoffset()
 //******************************************************************
 void AntennaTune()
 {
+  MenuExitFlag = false;
   DisplayText("ANT TUNE", 0, 0);
+  selectBandLPF(TXdialFreq[TXband]);
+  setSWRRelay(true); // Switch resistive SWR bridge relay inline before enabling RF
+  altDelay(20);      // Allow relay contacts to settle before applying RF
   Si5351_write(CLK_ENABLE_CONTROL, 0b00000101); // Enable CLK1 - disable CLK0 & CLK2
   setfreq();
 
   do
   {
-    if (digitalRead(menu) == LOW) MenuExitFlag = true;
+    if (touchReadButton(menu) == LOW) MenuExitFlag = true;
 
     display.setCursor(0, 0);
     digitalWrite(XmitLED, HIGH);
     si5351aSetFreq(SYNTH_MS_1, (TXdialFreq [TXband] + TXoffset), 0);
-    SWRval = analogRead(A3);  // read the input pin
+    SWRval = analogRead(A3);  // read the SWR detector input pin
     display.setCursor(0, 48);
     SWRval = SWRval / 20;
     display.setTextSize(1); // Draw 1X-scale text
@@ -2478,12 +2803,18 @@ void AntennaTune()
       if (i < SWRval) display.print(F("*"));
       else display.print(F(" "));
     }
+    char jcmd[24];
+    snprintf(jcmd, sizeof(jcmd), "j0.val=%d", constrain(SWRval * 5, 0, 100));
+    display.sendCmd(jcmd);
     display.display();
     altDelay(100);
-    display.setTextSize(2); // Draw 2X-scale text
+    display.setTextSize(2); // Draw 1X-scale text
     display.display();
   } while (MenuExitFlag == false);
-  Si5351_write(CLK_ENABLE_CONTROL, 0b00000111); // Disable clocks
+  Si5351_write(CLK_ENABLE_CONTROL, 0b00000111); // Disable clocks first (avoid hot-switching relay)
+  digitalWrite(XmitLED, LOW);
+  altDelay(20);
+  setSWRRelay(false); // Switch SWR bridge out of line for normal operation
 }
 
 
@@ -2778,7 +3109,7 @@ void transmitPrep()
 
 
   //Turn tranmitter inhibit on and off during non-transmit period
-  if (digitalRead(pushButton2) == LOW & suspendUpdateFlag == false)
+  if (touchReadButton(pushButton2) == LOW & suspendUpdateFlag == false)
   {
     altDelay(200);
     WSPR_toggle = !WSPR_toggle;
@@ -2859,14 +3190,14 @@ void ModeSelect()
   DisplayText("PB1: Down", 0, 1); //("text",col,row)
   DisplayText("PB4: Up  ", 0, 2); //("text",col,row)
   DisplayText("2:3 save  ", 0, 3); //("text",col,row)
-  if ((digitalRead(pushButton2) == LOW) & (digitalRead(pushButton3) == LOW)) saveEEPROM();
+  if ((touchReadButton(pushButton2) == LOW) & (touchReadButton(pushButton3) == LOW)) saveEEPROM();
 
-  if (digitalRead(pushButton4) == LOW)
+  if (touchReadButton(pushButton4) == LOW)
   {
     mode++;
     altDelay(200);
   }
-  if (digitalRead(pushButton1) == LOW)
+  if (touchReadButton(pushButton1) == LOW)
   {
     mode--;
     altDelay(200);
@@ -2999,6 +3330,9 @@ void setfreq()
   else if (suspendUpdateFlag == true & mode == 8) frequency = TXdialFreq [TXband] + FT8_TXoffset; // Temporarily store Freq_1 (FT8 mode)
   else frequency = TXdialFreq [TXband]; // Temporarily store Freq_1 (offset not added)
 
+  // Automatically select the appropriate 40m / 20m / 10m Lowpass Filter relay for the current band
+  selectBandLPF(TXdialFreq[TXband]);
+
   display.setCursor(0, 16);
   if (frequency >= 1000000UL)
   {
@@ -3058,6 +3392,8 @@ void transmit()
     TXoffset = TXoffset + 10UL;
     if (TXoffset > 1550UL) TXoffset = 1440UL;
   }
+  setSWRRelay(false);
+  selectBandLPF(TXdialFreq[TXband]);
   Si5351_write(CLK_ENABLE_CONTROL, 0b00000101); // Enable CLK1 - disable CLK0 & CLK2
   setfreq();
   display.setCursor(0, 32);
@@ -3129,6 +3465,8 @@ void FT8transmit()
 {
   TransmitFlag = false;
   suspendUpdateFlag = true;
+  setSWRRelay(false);
+  selectBandLPF(TXdialFreq[TXband]);
   Si5351_write(CLK_ENABLE_CONTROL, 0b00000101); // Enable CLK1 - disable CLK0 & CLK2
   setfreq();
   display.setCursor(0, 32);
@@ -3222,7 +3560,7 @@ void CWtransmit()
   while (TickCounter < 110) //Transmit CW for 110 seconds
   {
     if (TXinterval == 1) TickCounter = 0; // Loop forever when interval = 1
-    if (digitalRead (menu) == LOW) TickCounter = 120;
+    if (touchReadButton(menu) == LOW) TickCounter = 120;
     MorseChar = CWmessage[i];
     altDelay(50);
     j = int(MorseChar);
@@ -3395,7 +3733,7 @@ void solar_conditions()
     display.setCursor(0, 48);
     display.print(F("available"));
     display.display();
-    while(digitalRead (menu) == HIGH){}; //Stop here until menu button is depressed
+    while(touchReadButton(menu) == HIGH){}; //Stop here until menu button is depressed
   }
 
   else
@@ -3542,7 +3880,7 @@ void solar_conditions()
   display.display();
   altDelay(1000);
   
-  while(digitalRead (menu) == HIGH){}; //Stop here until menu button is depressed
+  while(touchReadButton(menu) == HIGH){}; //Stop here until menu button is depressed
   }
 }
 
@@ -3649,8 +3987,10 @@ unsigned long altDelay(unsigned long delayTime)
   time_now = millis();
   while (millis() < time_now + delayTime) //delay 1 second
   {
+    pollNextionTouch();
     __asm__ __volatile__ ("nop");
   }
+  return 0;
 }
 
 

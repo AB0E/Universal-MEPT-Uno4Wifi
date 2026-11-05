@@ -1,0 +1,60 @@
+================================================================================
+STATION AB0E / GRID EM28 - PRECOMPUTED SYMBOL TABLES & PROTOCOL ENCODING
+Rig: W3PM Ultimate MEPT (UNO R4 WiFi + Si5351A + Nextion + 8-Channel Relay)
+================================================================================
+
+1. STATION PARAMETERS
+--------------------------------------------------------------------------------
+Callsign:           AB0E
+Grid Locator:       EM28
+Transmit Power:     7 dBm (approx 5.0 mW EIRP)
+CW/FSK ID String:   " AB0E EM28 "
+
+2. FT8 CHANNEL SYMBOLS (79 Tones)
+--------------------------------------------------------------------------------
+Message:            "CQ AB0E EM28"
+Protocol Standard:  WSJT-X 77-bit payload (CQ token + call hash + grid)
+77-bit Packed Hex:  0000002292f60b883b08
+14-bit CRC-14:      0x2757 (Polynomial 0x2757)
+91-bit Message+CRC: 0000002292f60b883b0649a0
+Forward Error Corr: LDPC(174,91) Generator Matrix
+Modulation:         8-FSK (tone spacing 6.25 Hz, baud 6.25 sym/s)
+Costas Sync Arrays: [3, 1, 4, 0, 6, 5, 2] located at tones 0-6, 36-42, and 72-78
+
+C++ Symbol Array:
+const uint8_t FT8symbols[79] = {
+  3, 1, 4, 0, 6, 5, 2, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 6, 1, 1,
+  2, 4, 4, 0, 3, 7, 0, 5, 0, 7, 2, 0, 3, 0, 0, 3, 3, 1, 4, 0,
+  6, 5, 2, 0, 4, 0, 6, 3, 2, 6, 2, 0, 5, 5, 3, 0, 1, 6, 3, 1,
+  3, 3, 4, 2, 1, 0, 5, 2, 1, 2, 5, 0, 3, 1, 4, 0, 6, 5, 2
+};
+
+3. WSPR CHANNEL SYMBOLS (162 Tones)
+--------------------------------------------------------------------------------
+Message:            "AB0E EM28 7"
+Protocol Standard:  50-bit packed message (28-bit call, 15-bit grid, 7-bit power)
+Convolutional Code: Rate 1/2, Constraint Length K=32
+Interleaving:       Bit-reversal interleaver
+Sync Vector:        162-bit pseudorandom polynomial vector added modulo 4
+Modulation:         4-FSK (tone spacing 1.4648 Hz, baud 1.4648 sym/s, duration 110.6s)
+
+C++ Symbol Array:
+const uint8_t WSPRsymbols[162] = {
+  1, 3, 0, 0, 0, 2, 0, 0, 3, 0, 0, 0, 1, 1, 1, 0, 0, 2, 1, 2,
+  0, 3, 0, 1, 3, 1, 3, 0, 0, 2, 2, 2, 2, 0, 1, 2, 2, 1, 0, 3,
+  0, 2, 2, 0, 0, 2, 3, 0, 1, 3, 2, 0, 3, 1, 0, 3, 0, 0, 0, 3,
+  1, 2, 1, 2, 2, 0, 0, 1, 3, 0, 3, 2, 3, 0, 3, 2, 3, 2, 2, 3,
+  0, 2, 3, 0, 3, 1, 0, 0, 0, 3, 1, 2, 3, 2, 3, 0, 2, 0, 1, 2,
+  0, 0, 0, 0, 3, 2, 2, 1, 2, 0, 1, 3, 1, 0, 3, 1, 0, 2, 3, 3,
+  0, 3, 0, 2, 2, 3, 1, 3, 0, 0, 2, 0, 0, 3, 2, 1, 0, 2, 1, 3,
+  0, 2, 0, 2, 2, 2, 0, 1, 3, 0, 1, 0, 1, 1, 2, 0, 0, 1, 1, 0,
+  0, 0
+};
+
+4. FST4W-120 GENERATION
+--------------------------------------------------------------------------------
+Message:            "AB0E EM28 7"
+Transmission Time:  120 Seconds
+WSJT-X CLI Command:
+  fst4sim "AB0E EM28 7" 120 1500 0.0 0.1 1.0 0 99 F > FST4W_message.txt
+================================================================================
