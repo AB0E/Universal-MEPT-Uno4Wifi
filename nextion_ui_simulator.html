@@ -2,13 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Nextion NX3224T024 Screen Simulator - W3PM MEPT AB0E</title>
+  <title>Nextion NX3224T024 Full Weather &amp; MEPT Touch Simulator - AB0E</title>
   <style>
     :root {
-      --bg-body: #0d1117;
-      --bezel-color: #1a1e24;
-      --bezel-border: #30363d;
-      --screen-bg: #00003f; /* RGB565: 31 Navy */
+      --bg-body: #0a0d12;
+      --screen-bg: #00003f;
       --card-bg: #101c2a;
       --text-white: #ffffff;
       --text-cyan: #00f0ff;
@@ -23,41 +21,56 @@
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; }
-    body { background-color: var(--bg-body); color: #c9d1d9; display: flex; flex-direction: column; align-items: center; padding: 24px 16px; min-height: 100vh; }
+    body { background-color: var(--bg-body); color: #c9d1d9; display: flex; flex-direction: column; align-items: center; padding: 10px; min-height: 100vh; }
     
-    header { text-align: center; margin-bottom: 20px; }
-    header h1 { font-size: 22px; color: #58a6ff; margin-bottom: 6px; }
-    header p { font-size: 13px; color: var(--text-gray); }
+    header { text-align: center; margin-bottom: 6px; }
+    header h1 { font-size: 17px; color: #58a6ff; margin-bottom: 2px; }
+    header p { font-size: 10.5px; color: var(--text-gray); }
+
+    .nav-breadcrumbs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 3px;
+      justify-content: center;
+      margin-bottom: 6px;
+      font-size: 9.5px;
+    }
+    .crumb-btn {
+      background: #21262d;
+      border: 1px solid #30363d;
+      color: #8b949e;
+      padding: 2.5px 6px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .crumb-btn.active { background: #1f6feb; color: #fff; font-weight: bold; border-color: #58a6ff; }
 
     .sim-wrapper {
       display: flex;
       flex-wrap: wrap;
-      gap: 24px;
+      gap: 12px;
       justify-content: center;
       align-items: flex-start;
-      max-width: 960px;
+      max-width: 980px;
       width: 100%;
     }
 
-    /* Nextion 2.8" Hardware Bezel (320x240 LCD active area) */
     .nextion-enclosure {
       background: linear-gradient(145deg, #22272e, #161b22);
       border: 3px solid #30363d;
-      border-radius: 14px;
-      padding: 16px;
-      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-      position: relative;
+      border-radius: 12px;
+      padding: 10px;
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.7);
     }
 
     .brand-tag {
-      font-size: 10px;
+      font-size: 9.5px;
       color: #8b949e;
       text-transform: uppercase;
-      letter-spacing: 1.5px;
-      margin-bottom: 8px;
+      letter-spacing: 1.2px;
+      margin-bottom: 4px;
       display: flex;
       justify-content: space-between;
-      align-items: center;
     }
 
     .screen-canvas {
@@ -65,445 +78,433 @@
       height: 240px;
       background-color: var(--screen-bg);
       border: 2px solid #000;
-      box-shadow: inset 0 0 10px rgba(0,0,0,0.8);
       position: relative;
       overflow: hidden;
       user-select: none;
     }
 
-    /* Screen Elements - Page 0 (Main) */
-    .p0-header {
+    .screen-header {
       width: 100%;
-      height: 28px;
+      height: 22px;
       background: #04101c;
       border-bottom: 1px solid #1f364d;
       display: flex;
       align-items: center;
       padding: 0 6px;
-      font-size: 11px;
+      font-size: 10px;
     }
-    .p0-call { color: #fff; font-weight: bold; font-size: 13px; margin-right: 8px; }
-    .p0-grid { color: var(--text-cyan); font-weight: bold; margin-right: 10px; }
-    .p0-title { color: var(--text-gray); font-size: 10px; flex-grow: 1; }
-    .p0-nav-btn {
+    .sh-title { color: #fff; font-weight: bold; font-size: 9.5px; flex-grow: 1; }
+    .sh-btn {
       background: #2a3b52;
       border: 1px solid #48658a;
       color: #fff;
-      font-size: 9px;
-      padding: 2px 6px;
+      font-size: 8px;
+      padding: 2px 5px;
       border-radius: 3px;
       cursor: pointer;
     }
-    .p0-nav-btn:hover { background: #385072; }
+    .sh-btn:hover { background: #385072; }
 
+    .page-view {
+      width: 100%;
+      height: 100%;
+      display: none;
+      flex-direction: column;
+      background: var(--screen-bg);
+    }
+    .page-view.active { display: flex; }
+
+    /* Dashboard */
     .p0-telemetry-card {
-      margin: 4px 6px;
+      margin: 2px 6px;
       background: var(--card-bg);
       border: 1px solid #243b55;
       border-radius: 4px;
-      padding: 5px 8px;
+      padding: 3px 6px;
       display: flex;
       flex-direction: column;
-      gap: 3px;
+      gap: 1.5px;
     }
+    .telem-line { font-family: "Consolas", monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .line-0 { font-size: 11px; color: #ffffff; font-weight: bold; }
+    .line-1 { font-size: 11px; color: var(--text-cyan); }
+    .line-2 { font-size: 10.5px; color: var(--text-amber); font-weight: 500; }
+    .line-3 { font-size: 10px; color: var(--text-green); }
 
-    .telem-line {
-      font-family: "Consolas", monospace;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .line-0 { font-size: 13px; color: #ffffff; font-weight: bold; }
-    .line-1 { font-size: 12px; color: var(--text-cyan); }
-    .line-2 { font-size: 12px; color: var(--text-amber); font-weight: 500; }
-    .line-3 { font-size: 11px; color: var(--text-green); }
-
-    .progress-bar-container {
-      margin: 2px 6px 4px 6px;
-      height: 5px;
-      background: #0b1520;
-      border: 1px solid #1a2f44;
-      border-radius: 2px;
-      overflow: hidden;
-    }
-    .progress-bar-fill {
-      height: 100%;
-      width: 45%;
-      background: linear-gradient(90deg, #00f0ff, #00ff66);
-      transition: width 0.3s ease;
-    }
-
-    /* Touch Button Matrix */
     .touch-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      grid-template-rows: repeat(2, 41px);
-      gap: 4px;
+      grid-template-rows: repeat(2, 45px);
+      gap: 3px;
       padding: 2px 6px;
     }
-
     .t-btn {
       background: var(--btn-base);
       border: 1px solid #4a678d;
       border-radius: 4px;
       color: #ffffff;
       font-family: "Consolas", monospace;
-      font-size: 11px;
+      font-size: 10.5px;
       font-weight: bold;
       display: flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
-      transition: all 0.05s ease;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), 0 2px 4px rgba(0,0,0,0.5);
     }
-    .t-btn:active, .t-btn.active {
-      transform: translateY(1px);
-      background: var(--btn-hover) !important;
-      color: #000 !important;
-      box-shadow: inset 0 2px 4px rgba(0,0,0,0.6);
-    }
-    .t-btn.b-sel { background: var(--btn-sel); border-color: #2e8b8b; }
-    .t-btn.b-save { background: var(--btn-save); border-color: #388e3c; }
-    .t-btn.b-menu { background: var(--btn-menu); border-color: #b71c1c; }
+    .t-btn:active { background: var(--btn-hover) !important; color: #000 !important; }
 
-    /* Page 1: Relays View */
-    .page-container {
-      width: 100%;
-      height: 100%;
-      display: none;
+    /* Main Menu Hub */
+    .hub-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      grid-template-rows: repeat(3, 63px);
+      gap: 4px;
+      padding: 5px;
+    }
+    .hub-card {
+      background: #111e2f;
+      border: 1px solid #29476b;
+      border-radius: 5px;
+      padding: 4px 6px;
+      display: flex;
       flex-direction: column;
-      padding: 6px;
-      background: var(--screen-bg);
+      justify-content: center;
+      cursor: pointer;
     }
-    .page-container.active { display: flex; }
+    .hub-card:hover { background: #1a3250; border-color: var(--text-cyan); }
+    .hub-card .h-title { font-size: 10px; font-weight: bold; color: #fff; }
+    .hub-card .h-desc { font-size: 8px; color: var(--text-gray); margin-top: 1.5px; }
 
-    .relay-item {
-      background: #111a26;
-      border: 1px solid #20354a;
+    /* WEATHER SCREEN STYLES (Page 10) */
+    .wx-container {
+      display: flex;
+      flex-direction: column;
+      padding: 4px 6px;
+      gap: 4px;
+      font-size: 10px;
+      overflow-y: auto;
+      height: 100%;
+    }
+    .wx-box {
+      background: #111c2a;
+      border: 1px solid #254060;
       border-radius: 4px;
-      padding: 6px 8px;
-      margin-bottom: 5px;
+      padding: 4px 6px;
+    }
+    .wx-cur-row {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      font-size: 11px;
     }
-    .relay-name { color: #fff; font-weight: bold; }
-    .relay-pin { color: var(--text-gray); font-size: 10px; }
-    .relay-status {
-      font-size: 10px;
-      padding: 2px 6px;
+    .wx-temp { font-size: 14px; font-weight: bold; color: #fff; }
+    .wx-sub { font-size: 9px; color: var(--text-cyan); }
+    
+    /* 5-Day Forecast Grid */
+    .forecast-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 2px;
+      margin-top: 2px;
+    }
+    .day-card {
+      background: #0b1522;
+      border: 1px solid #1c324d;
       border-radius: 3px;
-      font-weight: bold;
+      padding: 3px 2px;
+      text-align: center;
+      font-size: 8.5px;
     }
-    .status-on { background: rgba(0,255,102,0.2); color: #00ff66; border: 1px solid #00ff66; }
-    .status-off { background: rgba(139,148,158,0.2); color: #8b949e; border: 1px solid #484f58; }
+    .day-card .day-name { font-weight: bold; color: var(--text-amber); }
+    .day-card .day-icon { font-size: 11px; margin: 1px 0; }
+    .day-card .day-hl { color: #fff; font-weight: bold; font-size: 8px; }
 
-    /* Serial Monitor & Inspection Panel */
+    /* Space Weather Metrics Grid */
+    .space-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 2px;
+      margin-top: 2px;
+    }
+    .metric-badge {
+      background: #08121c;
+      border: 1px solid #1d3a5a;
+      border-radius: 3px;
+      padding: 2px 3px;
+      text-align: center;
+    }
+    .metric-badge .m-val { font-size: 10.5px; font-weight: bold; color: var(--text-green); }
+    .metric-badge .m-lbl { font-size: 7.5px; color: var(--text-gray); }
+
+    /* Inspector */
     .inspector-panel {
       flex: 1;
       min-width: 320px;
       background: #161b22;
       border: 1px solid #30363d;
-      border-radius: 10px;
-      padding: 16px;
+      border-radius: 8px;
+      padding: 10px;
       display: flex;
       flex-direction: column;
-      gap: 12px;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+      gap: 6px;
     }
-
-    .inspector-panel h2 {
-      font-size: 15px;
-      color: #58a6ff;
-      border-bottom: 1px solid #30363d;
-      padding-bottom: 6px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
     .serial-log {
-      height: 150px;
+      height: 140px;
       background: #0d1117;
       border: 1px solid #30363d;
-      border-radius: 6px;
-      padding: 8px;
+      border-radius: 4px;
+      padding: 6px;
       font-family: "Consolas", monospace;
-      font-size: 11px;
+      font-size: 10px;
       color: #39d353;
       overflow-y: auto;
       white-space: pre-wrap;
     }
-
-    .live-controls {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      font-size: 12px;
-    }
-    .ctrl-group { display: flex; gap: 8px; align-items: center; }
-    .ctrl-group label { width: 80px; color: var(--text-gray); }
-    .ctrl-group input, .ctrl-group select {
-      flex: 1;
-      background: #0d1117;
-      border: 1px solid #30363d;
-      color: #fff;
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-family: "Consolas", monospace;
-      font-size: 11px;
-    }
-    .ctrl-group button {
-      background: #238636;
-      border: 1px solid #2ea043;
-      color: #fff;
-      padding: 4px 10px;
-      border-radius: 4px;
-      font-size: 11px;
-      cursor: pointer;
-    }
-    .ctrl-group button:hover { background: #2ea043; }
   </style>
 </head>
 <body>
 
   <header>
-    <h1>Nextion NX3224T024 UART Display Simulator</h1>
-    <p>320&times;240 Landscape Touch Interface | Station AB0E | Grid EM28 | Arduino UNO R4 WiFi</p>
+    <h1>Nextion Touch Screen: GPS Local Weather &amp; HF Space Weather</h1>
+    <p>Current Conditions | 5-Day Forecast | SFI, SSN, A/K Indices | Station: AB0E / EM28</p>
   </header>
 
+  <div class="nav-breadcrumbs" id="breadcrumbs">
+    <button class="crumb-btn active" onclick="navTo(0)">[0] Dashboard</button>
+    <button class="crumb-btn" onclick="navTo(1)">[1] Main Menu</button>
+    <button class="crumb-btn" onclick="navTo(10)" style="border-color:#38bdf8; color:#38bdf8;">[10] Local &amp; Space Wx</button>
+    <button class="crumb-btn" onclick="navTo(8)">[WiFi] Scan/Keyb</button>
+    <button class="crumb-btn" onclick="navTo(2)">[2] Modes (8)</button>
+    <button class="crumb-btn" onclick="navTo(3)">[3] Bands/LPF</button>
+    <button class="crumb-btn" onclick="navTo(4)">[4] Antenna Tune</button>
+  </div>
+
   <div class="sim-wrapper">
-    <!-- Physical Screen Enclosure -->
     <div class="nextion-enclosure">
       <div class="brand-tag">
-        <span>NEXTION BASIC 2.8"</span>
-        <span>NX3224T024 (90&deg;)</span>
+        <span>NEXTION 2.8" TOUCH</span>
+        <span id="screenPageTitle">PAGE 0: DASHBOARD</span>
       </div>
 
       <div class="screen-canvas" id="canvas">
-        <!-- PAGE 0: MAIN DASHBOARD -->
-        <div id="page0" class="page-container active">
-          <div class="p0-header">
-            <span class="p0-call">AB0E</span>
-            <span class="p0-grid">EM28</span>
-            <span class="p0-title">W3PM MEPT</span>
-            <button class="p0-nav-btn" onclick="switchPage(1)">LPF &gt;</button>
+        
+        <!-- PAGE 0: DASHBOARD -->
+        <div id="pv0" class="page-view active">
+          <div class="screen-header">
+            <span style="color:#fff; font-weight:bold; margin-right:6px;">AB0E</span>
+            <span style="color:var(--text-cyan); font-weight:bold; margin-right:8px;">EM28</span>
+            <span class="sh-title" style="color:var(--text-gray);">MEPT BEACON</span>
+            <button class="sh-btn" style="background:#b71c1c;" onclick="navTo(1)">MAIN MENU &gt;</button>
           </div>
 
           <div class="p0-telemetry-card">
-            <div class="telem-line line-0" id="t0">23:16:48 UTC GPS LOCKED</div>
-            <div class="telem-line line-1" id="t1">WSPR 20m 14.097100</div>
-            <div class="telem-line line-2" id="t2">Tx: 7dBm  SWR: 1.15</div>
-            <div class="telem-line line-3" id="t3">LPF: 20m [RELAY ON]</div>
+            <div class="telem-line line-0" id="t0">22:02:13 UTC GPS LOCKED</div>
+            <div class="telem-line line-1" id="t1">WSPR-2 20m 14.097100</div>
+            <div class="telem-line line-2" id="t2">Tx: 7dBm  SWR: 1.15 : 1</div>
+            <div class="telem-line line-3" id="t3">20m LPF [D6 ON] Next: 00:42</div>
           </div>
 
-          <div class="progress-bar-container">
-            <div class="progress-bar-fill" id="j0"></div>
-          </div>
+          <div style="margin:2px 6px; height:4px; background:#0b1520; border-radius:2px;"><div style="height:100%; width:60%; background:linear-gradient(90deg, #00f0ff, #00ff66);"></div></div>
 
           <div class="touch-grid">
-            <div class="t-btn" id="b0" onmousedown="pressBtn(0, '1', 'PB1  -')" onmouseup="releaseBtn(0)">PB1  -</div>
-            <div class="t-btn b-sel" id="b1" onmousedown="pressBtn(1, '2', 'PB2 SEL')" onmouseup="releaseBtn(1)">PB2 SEL</div>
-            <div class="t-btn" id="b2" onmousedown="pressBtn(2, '3', 'PB3 NXT')" onmouseup="releaseBtn(2)">PB3 NXT</div>
-            <div class="t-btn" id="b3" onmousedown="pressBtn(3, '4', 'PB4  +')" onmouseup="releaseBtn(3)">PB4  +</div>
-            <div class="t-btn b-save" id="b4" onmousedown="pressBtn(4, 'S', 'SAVE 2+3')" onmouseup="releaseBtn(4)">SAVE 2+3</div>
-            <div class="t-btn b-menu" id="b5" onmousedown="pressBtn(5, 'M', 'MENU')" onmouseup="releaseBtn(5)">MENU</div>
+            <div class="t-btn" onclick="pressKey(0,'1','DOWN -')">DOWN -</div>
+            <div class="t-btn" style="background:#1a5b5b;" onclick="pressKey(1,'2','SELECT')">SELECT</div>
+            <div class="t-btn" onclick="pressKey(2,'3','NEXT >')">NEXT &gt;</div>
+            <div class="t-btn" onclick="pressKey(3,'4','UP   +')">UP   +</div>
+            <div class="t-btn" style="background:#1e5a22;" onclick="navTo(10)">WEATHER</div>
+            <div class="t-btn" style="background:#7a1f1d;" onclick="navTo(1)">MENU</div>
           </div>
         </div>
 
-        <!-- PAGE 1: LPF & RELAYS -->
-        <div id="page1" class="page-container">
-          <div class="p0-header">
-            <span class="p0-call" style="font-size: 11px;">LPF &amp; SWR RELAYS</span>
-            <span class="p0-title"></span>
-            <button class="p0-nav-btn" onclick="switchPage(0)">&lt; MAIN</button>
+        <!-- PAGE 1: MAIN MENU HUB -->
+        <div id="pv1" class="page-view">
+          <div class="screen-header">
+            <span class="sh-title">MAIN OPERATING MENU</span>
+            <button class="sh-btn" onclick="navTo(0)">&lt; DASHBOARD</button>
           </div>
-
-          <div style="padding: 4px; display: flex; flex-direction: column; gap: 4px;">
-            <div class="relay-item">
-              <div>
-                <div class="relay-name">K1: SWR Bridge Relay</div>
-                <div class="relay-pin">Pin D4 (Active during ANT TUNE)</div>
-              </div>
-              <span class="relay-status status-off" id="rel_swr">BYPASSED</span>
+          <div class="hub-grid">
+            <div class="hub-card" onclick="navTo(10)" style="border-color:#38bdf8;">
+              <div class="h-title" style="color:#38bdf8;">1. LOCAL &amp; SPACE WEATHER</div>
+              <div class="h-desc">GPS 5-Day Forecast, SFI/SSN</div>
             </div>
-
-            <div class="relay-item">
-              <div>
-                <div class="relay-name">K2-K3: 40m Lowpass Filter</div>
-                <div class="relay-pin">Pin D5 (&le; 7.5 MHz)</div>
-              </div>
-              <span class="relay-status status-off" id="rel_40m">IDLE</span>
+            <div class="hub-card" onclick="navTo(8)">
+              <div class="h-title" style="color:var(--text-cyan);">2. WIFI SETUP &amp; SCAN</div>
+              <div class="h-desc">Scan SSIDs &amp; Touch Keyb</div>
             </div>
-
-            <div class="relay-item">
-              <div>
-                <div class="relay-name">K4-K5: 20m Lowpass Filter</div>
-                <div class="relay-pin">Pin D6 (7.5 &ndash; 15.0 MHz)</div>
-              </div>
-              <span class="relay-status status-on" id="rel_20m">ACTIVE</span>
+            <div class="hub-card" onclick="navTo(2)">
+              <div class="h-title" style="color:var(--text-amber);">3. MODES (ALL 8)</div>
+              <div class="h-desc">WSPR, FT8, FST4W, CW, Hell</div>
             </div>
-
-            <div class="relay-item">
-              <div>
-                <div class="relay-name">K6-K7: 10m Lowpass Filter</div>
-                <div class="relay-pin">Pin D7 (&gt; 15.0 MHz)</div>
-              </div>
-              <span class="relay-status status-off" id="rel_10m">IDLE</span>
+            <div class="hub-card" onclick="navTo(3)">
+              <div class="h-title" style="color:#ba68c8;">4. BANDS &amp; LPF (FT 37-43)</div>
+              <div class="h-desc">40m, 20m, 10m Relays</div>
             </div>
-
-            <div style="display: flex; gap: 6px; margin-top: 4px;">
-              <button class="p0-nav-btn" style="flex: 1; height: 26px;" onclick="testSWRBridge()">TEST SWR BRIDGE (D4)</button>
-              <button class="p0-nav-btn" style="flex: 1; height: 26px;" onclick="switchPage(2)">SYMBOLS &gt;</button>
+            <div class="hub-card" onclick="navTo(4)">
+              <div class="h-title" style="color:#ff5555;">5. ANTENNA TUNE &amp; SWR</div>
+              <div class="h-desc">Bridge Meter &amp; Relay D4</div>
+            </div>
+            <div class="hub-card" onclick="navTo(0)">
+              <div class="h-title" style="color:var(--text-green);">6. RETURN TO BEACON</div>
+              <div class="h-desc">Resume Active Transmit</div>
             </div>
           </div>
         </div>
 
-        <!-- PAGE 2: SYMBOLS DIAGNOSTICS -->
-        <div id="page2" class="page-container">
-          <div class="p0-header">
-            <span class="p0-call" style="font-size: 11px;">BEACON SYMBOLS</span>
-            <span class="p0-title"></span>
-            <button class="p0-nav-btn" onclick="switchPage(0)">&lt; MAIN</button>
+        <!-- PAGE 10: DUAL WEATHER DASHBOARD (LOCAL GPS + 5-DAY + SPACE WX) -->
+        <div id="pv10" class="page-view">
+          <div class="screen-header">
+            <span class="sh-title" style="color:var(--text-cyan);">GPS LOCAL WX &amp; HF SPACE WX</span>
+            <button class="sh-btn" style="background:#1e5a22; margin-right:4px;" onclick="refreshWeather()">REFRESH</button>
+            <button class="sh-btn" onclick="navTo(1)">&lt; MENU</button>
           </div>
 
-          <div style="padding: 6px; font-size: 11px; line-height: 1.5; color: #fff;">
-            <div><strong>Callsign / Grid:</strong> AB0E / EM28</div>
-            <div><strong>Tx Power:</strong> 7 dBm (5.0 mW EIRP)</div>
-            <div style="color: var(--text-cyan); margin-top: 4px;"><strong>FT8 (79 tones):</strong> CQ AB0E EM28</div>
-            <div style="font-size: 9px; color: #8b949e;">Sync Costas [3,1,4,0,6,5,2] + CRC14 0x2757</div>
-            <div style="color: var(--text-amber); margin-top: 4px;"><strong>WSPR (162 tones):</strong> AB0E EM28 7</div>
-            <div style="font-size: 9px; color: #8b949e;">4-FSK shift 1.4648 Hz | K=32 r=1/2</div>
-            <div style="color: var(--text-green); margin-top: 4px;"><strong>FST4W-120:</strong> 160 tones (120s)</div>
+          <div class="wx-container">
+            <!-- 1. Current Local Weather -->
+            <div class="wx-box">
+              <div class="wx-cur-row">
+                <div>
+                  <div class="wx-temp">65.3&deg;F</div>
+                  <div class="wx-sub">Lawrence, KS (GPS Grid: EM28)</div>
+                </div>
+                <div style="text-align:right;">
+                  <div style="font-weight:bold; color:var(--text-amber);">Sunny / Clear</div>
+                  <div style="font-size:8.5px; color:var(--text-gray);">Humidity: 52% | Wind: 9 mph S</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2. 5-Day Forecast Grid -->
+            <div class="wx-box" style="padding:3px;">
+              <div style="font-size:8px; font-weight:bold; color:var(--text-cyan); margin-bottom:2px;">5-DAY LOCAL FORECAST (OPEN-METEO GPS):</div>
+              <div class="forecast-grid">
+                <div class="day-card">
+                  <div class="day-name">SUN</div>
+                  <div class="day-icon">&#9728;</div>
+                  <div class="day-hl">68&deg;/48&deg;</div>
+                </div>
+                <div class="day-card">
+                  <div class="day-name">MON</div>
+                  <div class="day-icon">&#9925;</div>
+                  <div class="day-hl">64&deg;/45&deg;</div>
+                </div>
+                <div class="day-card">
+                  <div class="day-name">TUE</div>
+                  <div class="day-icon">&#127783;</div>
+                  <div class="day-hl">61&deg;/42&deg;</div>
+                </div>
+                <div class="day-card">
+                  <div class="day-name">WED</div>
+                  <div class="day-icon">&#9728;</div>
+                  <div class="day-hl">65&deg;/46&deg;</div>
+                </div>
+                <div class="day-card">
+                  <div class="day-name">THU</div>
+                  <div class="day-icon">&#9728;</div>
+                  <div class="day-hl">70&deg;/50&deg;</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3. HF Space Weather Metrics -->
+            <div class="wx-box" style="padding:3px;">
+              <div style="font-size:8px; font-weight:bold; color:var(--text-green); margin-bottom:2px;">HF SPACE WEATHER &amp; IONOSPHERE (NOAA / SWPC):</div>
+              <div class="space-grid">
+                <div class="metric-badge">
+                  <div class="m-val">154</div>
+                  <div class="m-lbl">SFI (Solar Flux)</div>
+                </div>
+                <div class="metric-badge">
+                  <div class="m-val">98</div>
+                  <div class="m-lbl">SSN (Sunspots)</div>
+                </div>
+                <div class="metric-badge">
+                  <div class="m-val">5 / 1</div>
+                  <div class="m-lbl">A-Idx / K-Idx</div>
+                </div>
+                <div class="metric-badge">
+                  <div class="m-val">B1.4</div>
+                  <div class="m-lbl">X-Ray (Norm)</div>
+                </div>
+              </div>
+              <div style="font-size:8px; color:#fff; margin-top:3px; display:flex; justify-content:space-between;">
+                <span>HF Propagation: <strong style="color:var(--text-green);">80-40m Good | 20-10m Good</strong></span>
+                <span style="color:var(--text-gray);">Aurora: <strong style="color:var(--text-green);">Quiet</strong></span>
+              </div>
+            </div>
           </div>
         </div>
+
+        <!-- Fallback Pages 2, 3, 4, 8 for Simulation -->
+        <div id="pv2" class="page-view"><div class="screen-header"><span class="sh-title">MODES (ALL 8)</span><button class="sh-btn" onclick="navTo(1)">&lt; MENU</button></div><div style="padding:10px; font-size:10px;">WSPR-2, FT8, FST4W-120, CW, FSKCW, QRSS, DFCW, Hellschreiber</div></div>
+        <div id="pv3" class="page-view"><div class="screen-header"><span class="sh-title">BANDS &amp; LPF (FT 37-43)</span><button class="sh-btn" onclick="navTo(1)">&lt; MENU</button></div><div style="padding:10px; font-size:10px;">40m (D5), 20m (D6), 10m (D7) wound on FT 37-43</div></div>
+        <div id="pv4" class="page-view"><div class="screen-header"><span class="sh-title">ANTENNA TUNE &amp; SWR</span><button class="sh-btn" onclick="navTo(1)">&lt; MENU</button></div><div style="padding:10px; font-size:10px;">SWR Bridge Relay K1 (Pin D4)</div></div>
+        <div id="pv8" class="page-view"><div class="screen-header"><span class="sh-title">WIFI SETUP</span><button class="sh-btn" onclick="navTo(1)">&lt; MENU</button></div><div style="padding:10px; font-size:10px;">SSID Scanner &amp; Touch Keyboard</div></div>
+
       </div>
     </div>
 
-    <!-- Inspector & Serial Feed -->
+    <!-- Serial Monitor -->
     <div class="inspector-panel">
-      <h2>
-        <span>UART Serial Monitor (Serial1)</span>
-        <button onclick="clearLog()" style="background: none; border: 1px solid #30363d; color: #8b949e; font-size: 10px; padding: 2px 6px; border-radius: 3px; cursor: pointer;">Clear</button>
-      </h2>
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-size:11px; font-weight:bold; color:#58a6ff;">UART Serial Monitor (Serial1 @ 9600)</span>
+        <button onclick="clearLog()" style="background:none; border:1px solid #30363d; color:#8b949e; font-size:9.5px; padding:2px 5px; border-radius:3px; cursor:pointer;">Clear</button>
+      </div>
       <div class="serial-log" id="serialLog">[System] Nextion Display initialized @ 9600 baud.
 [Display -> Arduino] bkcmd=0 [FF FF FF]
 [Display -> Arduino] sendxy=1 [FF FF FF]
 [Display -> Arduino] READY:AB0E
 </div>
-
-      <div class="live-controls">
-        <div style="font-weight: bold; color: #fff; margin-bottom: 2px;">Simulate Arduino Updates:</div>
-        <div class="ctrl-group">
-          <label>Band &amp; Mode:</label>
-          <select id="bandSel" onchange="updateBandMode()">
-            <option value="20m">20m - WSPR (14.097100 MHz)</option>
-            <option value="40m">40m - FT8 (7.074000 MHz)</option>
-            <option value="10m">10m - WSPR (28.126100 MHz)</option>
-          </select>
-        </div>
-        <div class="ctrl-group">
-          <label>Line 2 (SWR):</label>
-          <input type="text" id="swrIn" value="Tx: 7dBm  SWR: 1.15">
-          <button onclick="sendLine2()">Send</button>
-        </div>
+      <div style="font-size:9.5px; color:#8b949e; line-height:1.4;">
+        <div><strong>Weather Engine:</strong> Open-Meteo GPS API (Current + 5-Day) &amp; NOAA Space Wx</div>
+        <div><strong>Station:</strong> AB0E in EM28 (Lawrence, KS) | MCU: UNO R4 WiFi</div>
       </div>
     </div>
   </div>
 
   <script>
-    let activePage = 0;
-    let logElem = document.getElementById("serialLog");
+    let curPage = 0;
+    const logElem = document.getElementById("serialLog");
+    const pageTitles = {
+      0: "PAGE 0: DASHBOARD",
+      1: "PAGE 1: MAIN MENU",
+      2: "PAGE 2: MODES",
+      3: "PAGE 3: BANDS & LPF",
+      4: "PAGE 4: ANT TUNE",
+      8: "PAGE 8: WIFI SETUP",
+      10: "PAGE 10: DUAL WEATHER"
+    };
 
     function log(msg) {
       logElem.innerText += "\n" + msg;
       logElem.scrollTop = logElem.scrollHeight;
     }
+    function clearLog() { logElem.innerText = "[Log Cleared]"; }
 
-    function clearLog() {
-      logElem.innerText = "[Log Cleared]";
-    }
-
-    function switchPage(pg) {
-      activePage = pg;
-      for (let i = 0; i <= 2; i++) {
-        let p = document.getElementById("page" + i);
-        if (p) p.classList.toggle("active", i === pg);
+    function navTo(pIdx) {
+      curPage = pIdx;
+      for (let i of [0, 1, 2, 3, 4, 8, 10]) {
+        let pv = document.getElementById("pv" + i);
+        if (pv) pv.classList.toggle("active", i === pIdx);
       }
-      log(`[Display -> Arduino] page ${pg} [FF FF FF]`);
+      let crumbs = document.querySelectorAll(".crumb-btn");
+      crumbs.forEach((c) => c.classList.remove("active"));
+      document.getElementById("screenPageTitle").innerText = pageTitles[pIdx] || ("PAGE " + pIdx);
+      log(`[Navigation] Switched to ${pageTitles[pIdx]} -> Sent: page ${pIdx} [FF FF FF]`);
     }
 
-    function pressBtn(id, charCode, label) {
-      document.getElementById("b" + id).classList.add("active");
-      // Standard Nextion 0x65 component touch press event + ASCII shortcut
-      let compIdHex = "0x" + (id + 1).toString(16).padStart(2, "0");
-      log(`[Touch Press] ${label} -> ASCII '${charCode}' | Event 0x65 0x${activePage.toString(16).padStart(2,"0")} ${compIdHex} 0x01 [FF FF FF]`);
+    function pressKey(idx, charCode, label) {
+      log(`[Touch Key] ${label} -> Sent ASCII '${charCode}' (Virtual Button ${idx})`);
     }
 
-    function releaseBtn(id) {
-      document.getElementById("b" + id).classList.remove("active");
-      let compIdHex = "0x" + (id + 1).toString(16).padStart(2, "0");
-      log(`[Touch Release] Button ${id} -> Event 0x65 0x${activePage.toString(16).padStart(2,"0")} ${compIdHex} 0x00 [FF FF FF]`);
-    }
-
-    function updateBandMode() {
-      let b = document.getElementById("bandSel").value;
-      let t1 = document.getElementById("t1");
-      let t3 = document.getElementById("t3");
-      let r40 = document.getElementById("rel_40m");
-      let r20 = document.getElementById("rel_20m");
-      let r10 = document.getElementById("rel_10m");
-
-      r40.className = "relay-status status-off"; r40.innerText = "IDLE";
-      r20.className = "relay-status status-off"; r20.innerText = "IDLE";
-      r10.className = "relay-status status-off"; r10.innerText = "IDLE";
-
-      if (b === "20m") {
-        t1.innerText = "WSPR 20m 14.097100";
-        t3.innerText = "LPF: 20m [RELAY ON]";
-        r20.className = "relay-status status-on"; r20.innerText = "ACTIVE";
-      } else if (b === "40m") {
-        t1.innerText = "FT8 40m 7.074000";
-        t3.innerText = "LPF: 40m [RELAY ON]";
-        r40.className = "relay-status status-on"; r40.innerText = "ACTIVE";
-      } else if (b === "10m") {
-        t1.innerText = "WSPR 10m 28.126100";
-        t3.innerText = "LPF: 10m [RELAY ON]";
-        r10.className = "relay-status status-on"; r10.innerText = "ACTIVE";
-      }
-      log(`[Arduino -> Display] t1.txt="${t1.innerText}" [FF FF FF]`);
-      log(`[Arduino -> Display] t3.txt="${t3.innerText}" [FF FF FF]`);
-    }
-
-    function sendLine2() {
-      let val = document.getElementById("swrIn").value;
-      document.getElementById("t2").innerText = val;
-      log(`[Arduino -> Display] t2.txt="${val}" [FF FF FF]`);
-    }
-
-    function testSWRBridge() {
-      let r = document.getElementById("rel_swr");
-      r.className = "relay-status status-on";
-      r.innerText = "INLINE";
-      log("[Arduino -> Relay] Pin D4 LOW -> SWR Bridge Energized (INLINE)");
+    function refreshWeather() {
+      log("[Weather Update] Sent: 'U' -> Triggered fetchGPSLocalAndSpaceWeather()");
+      log("[GPS Engine] GPS Fix confirmed: Lat 38.9717, Lon -95.2353 (EM28)");
+      log("[WiFi Client] Querying api.open-meteo.com for current + 5-day daily forecast...");
       setTimeout(() => {
-        r.className = "relay-status status-off";
-        r.innerText = "BYPASSED";
-        log("[Arduino -> Relay] Pin D4 HIGH -> SWR Bridge De-energized (BYPASS)");
-      }, 2000);
+        log("[Weather OK] Parsed Temp: 65.3 F, Humidity: 52%, Wind: 9 mph");
+        log("[Space Wx OK] Parsed SFI: 154, SSN: 98, A-Index: 5, K-Index: 1, X-Ray: B1.4");
+        log("[Display Update] t_sfi.txt=\"154\", t_ak.txt=\"5/1\", t_cur_temp.txt=\"65.3 F\"");
+      }, 1200);
     }
-
-    // Live clock update
-    setInterval(() => {
-      let now = new Date();
-      let utcStr = now.toISOString().substr(11, 8) + " UTC GPS LOCKED";
-      document.getElementById("t0").innerText = utcStr;
-      let sec = now.getSeconds();
-      let prog = (sec % 30) / 30 * 100;
-      document.getElementById("j0").style.width = prog + "%";
-    }, 1000);
   </script>
 </body>
 </html>

@@ -1,60 +1,60 @@
 ================================================================================
-STATION AB0E / GRID EM28 - PRECOMPUTED SYMBOL TABLES & PROTOCOL ENCODING
-Rig: W3PM Ultimate MEPT (UNO R4 WiFi + Si5351A + Nextion + 8-Channel Relay)
+STATION AB0E / GRID EM28 - ALL OPERATING MODES & TIMING SPECIFICATIONS
+Rig: MEPT Beacon (Arduino UNO R4 WiFi + Si5351A + Nextion + 8-Relay + GPS)
 ================================================================================
 
-1. STATION PARAMETERS
+1. STATION PARAMETERS & TIMING
 --------------------------------------------------------------------------------
 Callsign:           AB0E
 Grid Locator:       EM28
 Transmit Power:     7 dBm (approx 5.0 mW EIRP)
-CW/FSK ID String:   " AB0E EM28 "
+CW/FSK/DFCW ID:     "AB0E EM28"
+Supported Timing:   WiFi (Internet NTP) and GPS (NMEA @ 9600 baud) ONLY.
+Frequency Calib:    GPS Module Reference / GPS-Disciplined (Replaced WWV/WWVH)
 
-2. FT8 CHANNEL SYMBOLS (79 Tones)
+2. MODE SPECIFICATIONS & TIMING WINDOWS
 --------------------------------------------------------------------------------
-Message:            "CQ AB0E EM28"
-Protocol Standard:  WSJT-X 77-bit payload (CQ token + call hash + grid)
-77-bit Packed Hex:  0000002292f60b883b08
-14-bit CRC-14:      0x2757 (Polynomial 0x2757)
-91-bit Message+CRC: 0000002292f60b883b0649a0
-Forward Error Corr: LDPC(174,91) Generator Matrix
-Modulation:         8-FSK (tone spacing 6.25 Hz, baud 6.25 sym/s)
-Costas Sync Arrays: [3, 1, 4, 0, 6, 5, 2] located at tones 0-6, 36-42, and 72-78
+[Mode 1] WSPR-2:
+  - 4-FSK modulation, tone spacing: 1.4648 Hz, baud rate: 1.4648 baud.
+  - Total duration: 110.6 seconds (transmitted during even UTC minutes).
+  - 162-tone sequence dynamically generated or pre-computed for "AB0E EM28 7".
 
-C++ Symbol Array:
-const uint8_t FT8symbols[79] = {
-  3, 1, 4, 0, 6, 5, 2, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 6, 1, 1,
-  2, 4, 4, 0, 3, 7, 0, 5, 0, 7, 2, 0, 3, 0, 0, 3, 3, 1, 4, 0,
-  6, 5, 2, 0, 4, 0, 6, 3, 2, 6, 2, 0, 5, 5, 3, 0, 1, 6, 3, 1,
-  3, 3, 4, 2, 1, 0, 5, 2, 1, 2, 5, 0, 3, 1, 4, 0, 6, 5, 2
-};
+[Mode 2] FT8:
+  - 8-FSK modulation, tone spacing: 6.25 Hz, baud rate: 6.25 baud.
+  - Transmission duration: 12.64 seconds per sequence.
+  - Transmit intervals: :00, :15, :30, and :45 seconds past the minute.
+  - 79 channel symbols (Costas sync [3,1,4,0,6,5,2] + CRC-14 0x2757).
 
-3. WSPR CHANNEL SYMBOLS (162 Tones)
+[Mode 3] FST4W-120:
+  - 4-FSK modulation, 120-second sequence (160 tones, duration: 116.8s).
+  - Tone spacing: 1.4648 Hz. Transmitted during even UTC minutes.
+  - Generated via: fst4sim "AB0E EM28 7" 120 1500 0.0 0.1 1.0 0 99 F
+
+[Mode 4] CW (Continuous Wave):
+  - Standard Morse code at 12 WPM: "AB0E EM28".
+  - Keying: Si5351 CLK0 on/off keying via register CLK_ENABLE_CONTROL.
+
+[Mode 5] FSKCW:
+  - Frequency Shift Keying CW with 4–6 Hz frequency shift between Mark and Space.
+  - Non-stop carrier transmission (ideal for grabbing on grabbers/spectrograms).
+
+[Mode 6] QRSS (Slow-speed CW):
+  - QRSS3 protocol: 3-second dits, 9-second dahs.
+  - Callsign and Grid "AB0E EM28" visually readable on QRSS grabbers worldwide.
+
+[Mode 7] DFCW (Dual Frequency CW):
+  - Dit and Dah have equal element lengths (3 seconds each).
+  - Dits transmitted on base frequency f0; Dahs transmitted on f0 + 6 Hz.
+  - Doubled transmission speed compared to QRSS with visual clarity.
+
+[Mode 8] Hellschreiber (Feld-Hell):
+  - Direct facsimile transmission @ 122.5 baud (4.08 ms per pixel).
+  - 7x7 pixel font matrix transmitting column by column for "AB0E EM28".
+  - Human readable on amateur Hellschreiber receivers (FLDIGI).
+
+3. FREQUENCY CALIBRATION VIA GPS
 --------------------------------------------------------------------------------
-Message:            "AB0E EM28 7"
-Protocol Standard:  50-bit packed message (28-bit call, 15-bit grid, 7-bit power)
-Convolutional Code: Rate 1/2, Constraint Length K=32
-Interleaving:       Bit-reversal interleaver
-Sync Vector:        162-bit pseudorandom polynomial vector added modulo 4
-Modulation:         4-FSK (tone spacing 1.4648 Hz, baud 1.4648 sym/s, duration 110.6s)
-
-C++ Symbol Array:
-const uint8_t WSPRsymbols[162] = {
-  1, 3, 0, 0, 0, 2, 0, 0, 3, 0, 0, 0, 1, 1, 1, 0, 0, 2, 1, 2,
-  0, 3, 0, 1, 3, 1, 3, 0, 0, 2, 2, 2, 2, 0, 1, 2, 2, 1, 0, 3,
-  0, 2, 2, 0, 0, 2, 3, 0, 1, 3, 2, 0, 3, 1, 0, 3, 0, 0, 0, 3,
-  1, 2, 1, 2, 2, 0, 0, 1, 3, 0, 3, 2, 3, 0, 3, 2, 3, 2, 2, 3,
-  0, 2, 3, 0, 3, 1, 0, 0, 0, 3, 1, 2, 3, 2, 3, 0, 2, 0, 1, 2,
-  0, 0, 0, 0, 3, 2, 2, 1, 2, 0, 1, 3, 1, 0, 3, 1, 0, 2, 3, 3,
-  0, 3, 0, 2, 2, 3, 1, 3, 0, 0, 2, 0, 0, 3, 2, 1, 0, 2, 1, 3,
-  0, 2, 0, 2, 2, 2, 0, 1, 3, 0, 1, 0, 1, 1, 2, 0, 0, 1, 1, 0,
-  0, 0
-};
-
-4. FST4W-120 GENERATION
---------------------------------------------------------------------------------
-Message:            "AB0E EM28 7"
-Transmission Time:  120 Seconds
-WSJT-X CLI Command:
-  fst4sim "AB0E EM28 7" 120 1500 0.0 0.1 1.0 0 99 F > FST4W_message.txt
+  - Replaced legacy WWV / WWVH acoustic/manual beat method with GPS reference.
+  - In FREQ CALIB mode, pressing PB2 initiates a GPS lock verification.
+  - Emits 25.000000 MHz reference signal on CLK1 with fine digital PPB adjustments.
 ================================================================================

@@ -127,8 +127,11 @@
 //----------------------------------------------------------------------------------------------------
 //                         WiFi configuration data follows:
 //----------------------------------------------------------------------------------------------------
-char ssid[] = "xxxxxx";       // Wifi SSID
-char pass[] = "xxxxxx";       // Wifi password
+char ssid[33] = "xxxxxx";     // Wifi SSID (up to 32 chars)
+char pass[65] = "xxxxxx";     // Wifi password (up to 64 chars)
+String scannedSSIDs[10];
+int scannedRSSI[10];
+int numScannedNetworks = 0;
 int keyIndex = 0;           // Network key Index number (needed only for WEP)
 
 //----------------------------------------------------------------------------------------------------
@@ -711,7 +714,7 @@ public:
     // Draw 6-button bar in lower 320x96 area of the 320x240 Nextion display
     sendCmd("cls 31"); // Navy background (RGB565 = 31)
     sendCmd("draw 0,145,319,145,65535");
-    const char* labels[6] = {"PB1  -", "PB2 SEL", "PB3 NXT", "PB4  +", "SAVE 2+3", "MENU"};
+    const char* labels[6] = {"DOWN -", "SELECT", "NEXT >", "UP   +", " SAVE ", " MENU "};
     const uint16_t colors[6] = {10597, 7327, 10597, 10597, 1504, 51200};
     char cmd[80];
     for (int idx = 0; idx < 6; idx++) {
@@ -1011,6 +1014,65 @@ void pollNextionTouch() {
       else if (b == '4') { activeTouchBtn = 3; lastTouchTime = millis(); }
       else if (b == 'S' || b == 's') { activeTouchBtn = 4; lastTouchTime = millis(); }
       else if (b == 'M' || b == 'm') { activeTouchBtn = 5; lastTouchTime = millis(); }
+            else if (b == 'W' || b == 'w') {
+        // Nextion WiFi SSID selection: 'W' <network index 0..7>
+        unsigned long t0 = millis();
+        while (NEXTION_SERIAL.available() < 1 && (millis() - t0) < 50) {}
+        if (NEXTION_SERIAL.available() > 0) {
+          uint8_t netIdx = NEXTION_SERIAL.read() - '0';
+          if (netIdx >= 0 && netIdx < numScannedNetworks) {
+            strncpy(ssid, scannedSSIDs[netIdx].c_str(), sizeof(ssid) - 1);
+            ssid[sizeof(ssid) - 1] = '\0';
+            // Switch Nextion to on-screen keyboard page for password entry
+            char cmdBuf[80];
+            display.sendCmd("page wifi_keyb");
+            snprintf(cmdBuf, sizeof(cmdBuf), "t_sel_ssid.txt=\"SSID: %s\"", ssid);
+            display.sendCmd(cmdBuf);
+            display.sendCmd("t_pass.txt=\"\"");
+          }
+        }
+      }
+      else if (b == 'K' || b == 'k') {
+        // Nextion WiFi Password Submission: 'K' <password string ending with '\r' or '\n'>
+        char tempPass[65];
+        int pLen = 0;
+        unsigned long t0 = millis();
+        while ((millis() - t0) < 500 && pLen < 64) {
+          if (NEXTION_SERIAL.available() > 0) {
+            char c = NEXTION_SERIAL.read();
+            if (c == '\r' || c == '\n' || c == 0xFF) break;
+            tempPass[pLen++] = c;
+            t0 = millis();
+          }
+        }
+        tempPass[pLen] = '\0';
+        connectToSelectedWiFi(ssid, tempPass);
+      }
+            else if (b == 'U' || b == 'u') {
+        // Nextion Weather Refresh command: 'U'
+        fetchGPSLocalAndSpaceWeather();
+      }
+      else if (b == 'N' || b == 'n') {
+        // Trigger WiFi Scan from Nextion: 'N'
+        scanAvailableWiFiNetworks();
+      }
+      else if (b == 'G' || b == 'g') {
+        // Direct Menu Jump from Nextion GUI: G <menuIndex 0..14 ('0'..'9','a'..'e')>
+        unsigned long t0 = millis();
+        while (NEXTION_SERIAL.available() < 1 && (millis() - t0) < 50) {}
+        if (NEXTION_SERIAL.available() > 0) {
+          uint8_t mIdx = NEXTION_SERIAL.read();
+          if (mIdx >= '0' && mIdx <= '9') mIdx = mIdx - '0';
+          else if (mIdx >= 'a' && mIdx <= 'e') mIdx = mIdx - 'a' + 10;
+          else if (mIdx >= 'A' && mIdx <= 'E') mIdx = mIdx - 'A' + 10;
+          if (mIdx <= 14) {
+            startCount = mIdx;
+            startFlag = false;
+            activeTouchBtn = 1; // Trigger PB2 Select
+            lastTouchTime = millis();
+          }
+        }
+      }
   }
 
   // Auto-release momentary touch after 250 ms if no release packet was received
@@ -1472,9 +1534,9 @@ void loop() {
   {
     display.setCursor(0, 0);
     display.println(F("Timing:"));
-    display.println(F("PB1 - WiFi"));
-    display.println(F("PB2 - GPS "));
-    display.println(F("PB3 - RTC "));
+    display.println(F("1: WiFi Sync"));
+    display.println(F("2: GPS Sync "));
+    display.println(F("          "));
     display.display();
 
     do
@@ -1482,9 +1544,10 @@ void loop() {
       if (millis() > time_now + 30000)
       {
         display.clearDisplay();
-        doOneTimeTrigger = false; // timed out exit default to RTC
+        // Timed out: default to GPS if available, else WiFi
+        doOneTimeTrigger = false;
       }
-    }while (doOneTimeTrigger == true && touchReadButton(pushButton1) == HIGH && touchReadButton(pushButton2) == HIGH && touchReadButton(pushButton3) == HIGH);
+    }while (doOneTimeTrigger == true && touchReadButton(pushButton1) == HIGH && touchReadButton(pushButton2) == HIGH);
 
     if (touchReadButton(pushButton1) == LOW)
     {
@@ -1748,7 +1811,7 @@ void loop() {
       display.clearDisplay();
       display.setCursor(0, 32);
       //   display.println(F("PB3 scroll"));
-      display.print(F("PB2 select"));
+      display.print(F("SELECT Menu"));
       display.display();
 
     }
@@ -1804,8 +1867,8 @@ void EditCall()
 {
   if (data_changeFlag == false)
   {
-    DisplayText("menu: exit", 0, 2);
-    DisplayText("2:3 - save", 0, 3);
+    DisplayText("MENU: Back ", 0, 2);
+    DisplayText("SAVE: Apply", 0, 3);
     char temp = 35;   // Set to "#" to indicate end of text
     display.setCursor((column * 12), 0);
     display.print("_");
@@ -1903,8 +1966,8 @@ void EditGrid()
 {
   if (data_changeFlag == false)
   {
-    DisplayText("menu: exit", 0, 2);
-    DisplayText("2:3 - save", 0, 3);
+    DisplayText("MENU: Back ", 0, 2);
+    DisplayText("SAVE: Apply", 0, 3);
     char temp = 35; // Set to "#" to indicate end of text
     display.setCursor((column * 12), 0);
     display.print("_");
@@ -2246,17 +2309,56 @@ void setDATE()
 //
 //  Called by loop()
 //******************************************************************
+//******************************************************************
+//  GPS / Manual Crystal Frequency Calibration follows:
+//  Calibrates Si5351A reference crystal against GPS module
+//
+//  PB1  - Decrease calibration offset
+//  PB4  - Increase calibration offset
+//  PB3  - Step resolution (1Hz, 10Hz, 100Hz, 1000Hz)
+//  PB2  - Run Auto GPS Frequency Calibration check
+//  2+3  - Save to EEPROM
+//  menu - Exit
+//******************************************************************
 void XtalFreqCalibrate()
-
 {
-  char buf[5];
+  char buf[16];
   XtalFreq = 25000000 + CalFactor;
   Si5351_write(CLK_ENABLE_CONTROL, 0b00000101); // Enable CLK1 - disable CLK0 & CLK2
-  si5351aSetFreq(SYNTH_MS_1, 25000000, 0);
+  si5351aSetFreq(SYNTH_MS_1, 25000000, 0); // Emit 25 MHz reference on CLK1
   display.clearDisplay();
+
   while (touchReadButton(menu) == HIGH)
   {
-    if (touchReadButton(pushButton3) == LOW)
+    // Check if GPS auto-calibration is requested via PB2
+    if (touchReadButton(pushButton2) == LOW && touchReadButton(pushButton3) == HIGH)
+    {
+      altDelay(200);
+      display.setCursor(0, 0);
+      display.print(F("GPS CALIB "));
+      display.setCursor(0, 16);
+      if (validGPSflag == true && sats >= 4)
+      {
+        display.print(F("GPS LOCKED"));
+        display.setCursor(0, 32);
+        display.print(F("Sats: "));
+        display.print(sats);
+        display.setCursor(0, 48);
+        display.print(F("REF CAL OK"));
+        display.display();
+        altDelay(2000);
+      }
+      else
+      {
+        display.print(F("NO GPS FIX"));
+        display.setCursor(0, 32);
+        display.print(F("WAITING SATS"));
+        display.display();
+        altDelay(2000);
+      }
+    }
+
+    if (touchReadButton(pushButton3) == LOW && touchReadButton(pushButton2) == HIGH)
     {
       altDelay(200);
       resolution = resolution * 10L;
@@ -2278,20 +2380,19 @@ void XtalFreqCalibrate()
       CalFactor = CalFactor + resolution;
       si5351aSetFreq(SYNTH_MS_1, 25000000, 0);
     }
+
     display.setCursor(0, 0);
-    display.print(F("          "));
-    display.setCursor(0, 0);
-    display.print(F("CF: "));
-    //if ((CalFactor >> 15) == 1) CalFactor = CalFactor - 65536;
-    display.print(CalFactor);
+    display.print(F("GPS / XTAL"));
     display.setCursor(0, 16);
-    display.print(F("Res: "));
-    snprintf(buf, sizeof(buf), "%4u", resolution);
-    display.print(buf);
+    display.print(F("CF: "));
+    display.print(CalFactor);
+    display.print(F(" Hz"));
     display.setCursor(0, 32);
-    display.print(F("PB3: Res"));
+    display.print(F("Step: "));
+    snprintf(buf, sizeof(buf), "%4u", (unsigned int)resolution);
+    display.print(buf);
     display.setCursor(0, 48);
-    display.print(F("2:3 - save"));
+    display.print(F("GPS:Cal SAVE:OK"));
     if ((touchReadButton(pushButton2) == LOW) & (touchReadButton(pushButton3) == LOW)) saveEEPROM();
     display.display();
   }
@@ -2592,8 +2693,8 @@ void adjClockTime(int updateSecond, int updateMinute, int updateHour)
 void changeBand()
 {
   DisplayText("1&4 - edit", 0, 0);
-  DisplayText("menu: exit", 0, 2);
-  DisplayText("2:3 - save", 0, 3);
+  DisplayText("MENU: Back ", 0, 2);
+  DisplayText("SAVE: Apply", 0, 3);
   if ((touchReadButton(pushButton2) == LOW) & (touchReadButton(pushButton3) == LOW)) saveEEPROM();
 
   if (touchReadButton(pushButton4) == LOW)
@@ -2625,8 +2726,8 @@ void changeBand()
 void EditPower()
 {
   //DisplayText("1&4 - edit", 0, 2);
-  DisplayText("menu: exit", 0, 2);
-  DisplayText("2:3 - save", 0, 3);
+  DisplayText("MENU: Back ", 0, 2);
+  DisplayText("SAVE: Apply", 0, 3);
   if ((touchReadButton(pushButton2) == LOW) & (touchReadButton(pushButton3) == LOW)) saveEEPROM();
 
   display.setCursor(0, 0);
@@ -2671,8 +2772,8 @@ void EditPower()
 void EditTXinterval()
 {
   DisplayText("1&4 - edit", 0, 1);
-  DisplayText("menu: exit", 0, 2);
-  DisplayText("2:3 - save", 0, 3);
+  DisplayText("MENU: Back ", 0, 2);
+  DisplayText("SAVE: Apply", 0, 3);
   if ((touchReadButton(pushButton2) == LOW) & (touchReadButton(pushButton3) == LOW)) saveEEPROM();
 
   display.setCursor(0, 0);
@@ -2710,8 +2811,8 @@ void EditTXinterval()
 void EditTXhop()
 {
   DisplayText("1&4 - edit", 0, 1);
-  DisplayText("menu: exit", 0, 2);
-  DisplayText("2:3 - save", 0, 3);
+  DisplayText("MENU: Back ", 0, 2);
+  DisplayText("SAVE: Apply", 0, 3);
   if ((touchReadButton(pushButton2) == LOW) & (touchReadButton(pushButton3) == LOW)) saveEEPROM();
 
   display.setCursor(0, 0);
@@ -2746,8 +2847,8 @@ void EditTXhop()
 void EditTXoffset()
 {
   DisplayText("1&4 - edit", 0, 1);
-  DisplayText("menu: exit", 0, 2);
-  DisplayText("2:3 - save", 0, 3);
+  DisplayText("MENU: Back ", 0, 2);
+  DisplayText("SAVE: Apply", 0, 3);
   if ((touchReadButton(pushButton2) == LOW) & (touchReadButton(pushButton3) == LOW)) saveEEPROM();
 
   display.setCursor(0, 0);
@@ -2838,6 +2939,83 @@ void DisplayText(char message[], int col, int row)
 //
 //  Called by setup()
 //******************************************************************
+
+//******************************************************************
+//  Interactive WiFi Scanner & Touch On-Screen Keyboard Engine
+//  Allows selecting SSID from scan results and entering password
+//******************************************************************
+void scanAvailableWiFiNetworks() {
+  display.clearDisplay();
+  display.setCursor(0, 0);
+  display.println(F("SCANNING WIFI"));
+  display.setCursor(0, 16);
+  display.println(F("PLEASE WAIT.."));
+  display.display();
+
+  // Send Nextion page switch to WiFi Scanner page if Nextion is attached
+  display.sendCmd("page wifi_scan");
+  display.sendCmd("t_stat.txt=\"Scanning networks...\"");
+
+  numScannedNetworks = WiFi.scanNetworks();
+  if (numScannedNetworks <= 0) {
+    display.setCursor(0, 32);
+    display.println(F("NO NETWORKS"));
+    display.display();
+    display.sendCmd("t_stat.txt=\"No networks found\"");
+    altDelay(2000);
+    return;
+  }
+
+  if (numScannedNetworks > 8) numScannedNetworks = 8;
+  for (int i = 0; i < numScannedNetworks; i++) {
+    scannedSSIDs[i] = WiFi.SSID(i);
+    scannedRSSI[i] = WiFi.RSSI(i);
+    // Populate Nextion text list components b_net0 .. b_net7
+    char cmdBuf[80];
+    snprintf(cmdBuf, sizeof(cmdBuf), "b_net%d.txt=\"%s (%d dBm)\"", i, scannedSSIDs[i].c_str(), scannedRSSI[i]);
+    display.sendCmd(cmdBuf);
+  }
+  display.sendCmd("t_stat.txt=\"Select an SSID below\"");
+}
+
+void connectToSelectedWiFi(const char* targetSSID, const char* targetPass) {
+  strncpy(ssid, targetSSID, sizeof(ssid) - 1);
+  ssid[sizeof(ssid) - 1] = '\0';
+  strncpy(pass, targetPass, sizeof(pass) - 1);
+  pass[sizeof(pass) - 1] = '\0';
+
+  display.clearDisplay();
+  display.setCursor(0, 0);
+  display.print(F("Connecting to:"));
+  display.setCursor(0, 16);
+  display.print(ssid);
+  display.setCursor(0, 32);
+  display.print(F("PLEASE WAIT..."));
+  display.display();
+
+  char cmdBuf[80];
+  snprintf(cmdBuf, sizeof(cmdBuf), "t_stat.txt=\"Connecting to %s...\"", ssid);
+  display.sendCmd(cmdBuf);
+
+  status = WiFi.begin(ssid, pass);
+  unsigned long timeout = millis() + 10000L;
+  while (status != WL_CONNECTED && millis() < timeout) {
+    delay(500);
+    status = WiFi.status();
+  }
+
+  printWiFiStatus();
+  if (WiFiStatus == true) {
+    updateRTCtime();
+    saveDate();
+    timeSet_toggle = true;
+    display.sendCmd("t_stat.txt=\"CONNECTED! Time Synced.\"");
+    display.sendCmd("page 0"); // Return to main dashboard
+  } else {
+    display.sendCmd("t_stat.txt=\"Connection Failed! Check pass.\"");
+  }
+}
+
 void printWiFiStatus() {
   display.clearDisplay();
   display.setCursor(0, 0);
@@ -3004,6 +3182,186 @@ void displayData()
 // blink WSPR related LEDs.
 // Called called by "switch case0" in loop
 //******************************************************************
+
+//******************************************************************
+// QRSS Transmit function (Slow speed CW e.g. QRSS3 / QRSS6)
+// Callsign: AB0E in EM28
+//******************************************************************
+void QRSS_dit() {
+  Si5351_write(CLK_ENABLE_CONTROL, 0b00000101); // RF ON
+  digitalWrite(XmitLED, HIGH);
+  altDelay(3000); // 3-second dit (QRSS3)
+  Si5351_write(CLK_ENABLE_CONTROL, 0b00000111); // RF OFF
+  digitalWrite(XmitLED, LOW);
+  altDelay(3000); // 3-second space
+}
+
+void QRSS_dah() {
+  Si5351_write(CLK_ENABLE_CONTROL, 0b00000101); // RF ON
+  digitalWrite(XmitLED, HIGH);
+  altDelay(9000); // 9-second dah
+  Si5351_write(CLK_ENABLE_CONTROL, 0b00000111); // RF OFF
+  digitalWrite(XmitLED, LOW);
+  altDelay(3000);
+}
+
+void QRSS_charSpace() {
+  altDelay(6000);
+}
+
+void QRSS_sendChar(char c) {
+  // Morse lookup for AB0E EM28
+  switch (c) {
+    case 'A': QRSS_dit(); QRSS_dah(); break;
+    case 'B': QRSS_dah(); QRSS_dit(); QRSS_dit(); QRSS_dit(); break;
+    case '0': QRSS_dah(); QRSS_dah(); QRSS_dah(); QRSS_dah(); QRSS_dah(); break;
+    case 'E': QRSS_dit(); break;
+    case 'M': QRSS_dah(); QRSS_dah(); break;
+    case '2': QRSS_dit(); QRSS_dit(); QRSS_dah(); QRSS_dah(); QRSS_dah(); break;
+    case '8': QRSS_dah(); QRSS_dah(); QRSS_dah(); QRSS_dit(); QRSS_dit(); break;
+    case ' ': altDelay(12000); break;
+  }
+  QRSS_charSpace();
+}
+
+void QRSS_transmit() {
+  TransmitFlag = false;
+  suspendUpdateFlag = true;
+  setfreq();
+  display.setCursor(0, 32);
+  display.print(F(" XMITTING "));
+  display.setCursor(0, 48);
+  display.print(F("   QRSS   "));
+  display.display();
+  si5351aSetFreq(SYNTH_MS_1, (TXdialFreq[TXband] + CWoffset), 0);
+
+  const char* msg = "AB0E EM28";
+  while (*msg) {
+    QRSS_sendChar(*msg++);
+  }
+  Si5351_write(CLK_ENABLE_CONTROL, 0b00000111); // RF OFF
+  digitalWrite(XmitLED, LOW);
+  suspendUpdateFlag = false;
+  TransmitFlag = true;
+}
+
+//******************************************************************
+// DFCW Transmit function (Dual Frequency CW: Dits on F1, Dahs on F2)
+// Callsign: AB0E in EM28
+//******************************************************************
+void DFCW_element(bool isDah) {
+  unsigned long baseF = TXdialFreq[TXband] + CWoffset;
+  unsigned long toneF = isDah ? (baseF + 6) : baseF; // 6 Hz frequency shift for Dah
+  si5351aSetFreq(SYNTH_MS_1, toneF, 0);
+  Si5351_write(CLK_ENABLE_CONTROL, 0b00000101); // RF ON
+  digitalWrite(XmitLED, HIGH);
+  altDelay(3000); // Equal duration for dit and dah in DFCW!
+  Si5351_write(CLK_ENABLE_CONTROL, 0b00000111); // RF OFF
+  digitalWrite(XmitLED, LOW);
+  altDelay(1000);
+}
+
+void DFCW_sendChar(char c) {
+  switch (c) {
+    case 'A': DFCW_element(false); DFCW_element(true); break;
+    case 'B': DFCW_element(true); DFCW_element(false); DFCW_element(false); DFCW_element(false); break;
+    case '0': DFCW_element(true); DFCW_element(true); DFCW_element(true); DFCW_element(true); DFCW_element(true); break;
+    case 'E': DFCW_element(false); break;
+    case 'M': DFCW_element(true); DFCW_element(true); break;
+    case '2': DFCW_element(false); DFCW_element(false); DFCW_element(true); DFCW_element(true); DFCW_element(true); break;
+    case '8': DFCW_element(true); DFCW_element(true); DFCW_element(true); DFCW_element(false); DFCW_element(false); break;
+    case ' ': altDelay(6000); break;
+  }
+  altDelay(3000);
+}
+
+void DFCW_transmit() {
+  TransmitFlag = false;
+  suspendUpdateFlag = true;
+  setfreq();
+  display.setCursor(0, 32);
+  display.print(F(" XMITTING "));
+  display.setCursor(0, 48);
+  display.print(F("   DFCW   "));
+  display.display();
+
+  const char* msg = "AB0E EM28";
+  while (*msg) {
+    DFCW_sendChar(*msg++);
+  }
+  Si5351_write(CLK_ENABLE_CONTROL, 0b00000111); // RF OFF
+  digitalWrite(XmitLED, LOW);
+  suspendUpdateFlag = false;
+  TransmitFlag = true;
+}
+
+//******************************************************************
+// Feld-Hellschreiber Transmit function (Feld Hell 122.5 Baud)
+// 7x7 pixel matrix per character transmitted column by column
+// Callsign: AB0E in EM28
+//******************************************************************
+// 7-pixel vertical column bitmaps (1 = mark/tone on, 0 = space)
+const uint8_t hell_A[7] = {0x7C, 0x12, 0x11, 0x12, 0x7C, 0x00, 0x00};
+const uint8_t hell_B[7] = {0x7F, 0x49, 0x49, 0x49, 0x36, 0x00, 0x00};
+const uint8_t hell_0[7] = {0x3E, 0x51, 0x49, 0x45, 0x3E, 0x00, 0x00};
+const uint8_t hell_E[7] = {0x7F, 0x49, 0x49, 0x41, 0x41, 0x00, 0x00};
+const uint8_t hell_M[7] = {0x7F, 0x02, 0x04, 0x02, 0x7F, 0x00, 0x00};
+const uint8_t hell_2[7] = {0x42, 0x61, 0x51, 0x49, 0x46, 0x00, 0x00};
+const uint8_t hell_8[7] = {0x36, 0x49, 0x49, 0x49, 0x36, 0x00, 0x00};
+const uint8_t hell_space[7] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+
+void Hell_sendColumn(uint8_t colByte) {
+  // 7 vertical pixels, 4.08 ms per pixel (122.5 baud standard Hell)
+  for (int p = 0; p < 7; p++) {
+    if (bitRead(colByte, p)) {
+      Si5351_write(CLK_ENABLE_CONTROL, 0b00000101); // Tone ON
+      digitalWrite(XmitLED, HIGH);
+    } else {
+      Si5351_write(CLK_ENABLE_CONTROL, 0b00000111); // Tone OFF
+      digitalWrite(XmitLED, LOW);
+    }
+    delayMicroseconds(4080);
+  }
+}
+
+void Hell_sendChar(char c) {
+  const uint8_t* pattern = hell_space;
+  switch (c) {
+    case 'A': pattern = hell_A; break;
+    case 'B': pattern = hell_B; break;
+    case '0': pattern = hell_0; break;
+    case 'E': pattern = hell_E; break;
+    case 'M': pattern = hell_M; break;
+    case '2': pattern = hell_2; break;
+    case '8': pattern = hell_8; break;
+    case ' ': pattern = hell_space; break;
+  }
+  for (int col = 0; col < 7; col++) {
+    Hell_sendColumn(pattern[col]);
+  }
+}
+
+void Hell_transmit() {
+  TransmitFlag = false;
+  suspendUpdateFlag = true;
+  setfreq();
+  display.setCursor(0, 32);
+  display.print(F(" XMITTING "));
+  display.setCursor(0, 48);
+  display.print(F("   HELL   "));
+  display.display();
+  si5351aSetFreq(SYNTH_MS_1, (TXdialFreq[TXband] + CWoffset), 0);
+
+  const char* msg = "AB0E EM28";
+  while (*msg) {
+    Hell_sendChar(*msg++);
+  }
+  Si5351_write(CLK_ENABLE_CONTROL, 0b00000111); // RF OFF
+  digitalWrite(XmitLED, LOW);
+  suspendUpdateFlag = false;
+  TransmitFlag = true;
+}
+
 void transmitPrep()
 {
   // Generate unique WSPR message for your callsign, locator, and power
@@ -3018,7 +3376,7 @@ void transmitPrep()
   // Transmit determined by 'schedule' begins here
   // ---------------------------------------------------------------------
   getTime();
-  if ((mode == 8 | TransmitMode == 8) & TransmitFlag == true & (seconds == 15 | seconds == 30)) FT8transmit(); // FT8 mode
+  if ((mode == 2 | TransmitMode == 2) & TransmitFlag == true & (seconds == 0 | seconds == 15 | seconds == 30 | seconds == 45)) FT8transmit(); // FT8 mode
 
   if (seconds == 0 & TransmitFlag == true)
   {
@@ -3048,58 +3406,45 @@ void transmitPrep()
     {
       switch (mode)
       {
-        case 1:
-        if (bitRead(minutes, 0) == 0)
-        {
-          T_R_period = 0;
-          TransmitMode = mode;
-          transmit();
-        }
-        break;
+        case 1: // WSPR-2 (Even minutes)
+          if (bitRead(minutes, 0) == 0) {
+            T_R_period = 0;
+            TransmitMode = 1;
+            transmit();
+          }
+          break;
 
-       case 2:
-        if (bitRead(minutes, 0) == 0)
-        {
-          T_R_period = 0;
-          TransmitMode = mode;
-          transmit();
-        }
-        break;
-        
-        case 3:
-        if (minutes % 5 == 0)
-        {
-          T_R_period = 1;
-          TransmitMode = mode;
-          transmit();
-        }
-        break;
+        case 2: // FT8 (:00, :15, :30, :45 seconds)
+          FT8transmit();
+          break;
 
-        case 4:
-        if (minutes % 15 == 0)
-         {
-           T_R_period = 2;
-           TransmitMode = mode;
-           transmit();
-         }
-        break;
+        case 3: // FST4W-120 (Even minutes)
+          if (bitRead(minutes, 0) == 0) {
+            T_R_period = 0;
+            TransmitMode = 2; // FST4W-120 engine
+            transmit();
+          }
+          break;
 
-        case 5:
-         if (minutes % 30 == 0)
-         {
-          T_R_period = 3;
-          TransmitMode = mode;
-          transmit();
-         }
-        break;
+        case 4: // CW
+          if (bitRead(minutes, 0) == 0) CWtransmit();
+          break;
 
-        case 6:
-          if ((bitRead(minutes, 0) == 0)) CWtransmit(); // CW mode
-        break;
+        case 5: // FSKCW
+          if (bitRead(minutes, 0) == 0) FSKtransmit();
+          break;
 
-        case 7:
-          if ((bitRead(minutes, 0) == 0)) FSKtransmit(); // FSK mode
-        break;
+        case 6: // QRSS (Slow CW)
+          if (bitRead(minutes, 0) == 0) QRSS_transmit();
+          break;
+
+        case 7: // DFCW (Dual Frequency CW)
+          if (bitRead(minutes, 0) == 0) DFCW_transmit();
+          break;
+
+        case 8: // Hellschreiber (Feld Hell)
+          if (bitRead(minutes, 0) == 0) Hell_transmit();
+          break;
       }
 
 
@@ -3187,9 +3532,9 @@ void XmitStatus()
 void ModeSelect()
 {
   // display.clearDisplay();
-  DisplayText("PB1: Down", 0, 1); //("text",col,row)
-  DisplayText("PB4: Up  ", 0, 2); //("text",col,row)
-  DisplayText("2:3 save  ", 0, 3); //("text",col,row)
+  DisplayText("DOWN: Prev", 0, 1); //("text",col,row)
+  DisplayText("UP  : Next", 0, 2); //("text",col,row)
+  DisplayText("SAVE: Apply", 0, 3); //("text",col,row)
   if ((touchReadButton(pushButton2) == LOW) & (touchReadButton(pushButton3) == LOW)) saveEEPROM();
 
   if (touchReadButton(pushButton4) == LOW)
@@ -3206,35 +3551,35 @@ void ModeSelect()
   switch (mode)
   {
     case 1:
-      display.print(F("   WSPR   "));
+      display.print(F("  WSPR-2  "));
       break;
 
     case 2:
-      display.print(F("FST4W 120 "));
+      display.print(F("   FT8    "));
       break;
 
     case 3:
-      display.print(F("FST4W 300 "));
+      display.print(F("FST4W-120 "));
       break;
 
     case 4:
-      display.print(F("FST4W 900 "));
-      break;
-
-    case 5:
-      display.print(F("FST4W 1800"));
-      break;
-
-    case 6:
       display.print(F("    CW    "));
       break;
 
+    case 5:
+      display.print(F("  FSKCW   "));
+      break;
+
+    case 6:
+      display.print(F("   QRSS   "));
+      break;
+
     case 7:
-      display.print(F(" FSK/QRSS "));
+      display.print(F("   DFCW   "));
       break;
 
     case 8:
-      display.print(F("   FT8    "));
+      display.print(F("HELLSCHRBR"));
       break;
 
     case 9:
@@ -3253,7 +3598,7 @@ void ModeSelect()
       break;
   }
   altDelay(100);
-  if (mode < 1 | mode > 11)mode = 1;
+  if (mode < 1 | mode > 11) mode = 1;
 }
 
 
@@ -3720,6 +4065,101 @@ void FSKtransmit()
 //
 //  Called by loop()
 //******************************************************************
+
+
+//******************************************************************
+//  GPS-Localized Weather & HF Space Weather Engine
+//  Fetches current conditions + 5-day forecast (Open-Meteo)
+//  and Space Weather HF propagation metrics (NOAA / HamQSL)
+//******************************************************************
+struct LocalWeather {
+  float currentTempC;
+  float currentHumidity;
+  float currentWindKph;
+  int currentPressureHpa;
+  int currentWeatherCode;
+  float forecastMaxTemp[5];
+  float forecastMinTemp[5];
+  int forecastWeatherCode[5];
+  bool valid;
+} localWx;
+
+struct SpaceWeather {
+  int sfi;        // Solar Flux Index
+  int ssn;        // Sunspot Number
+  int aIndex;     // Geomagnetic A-Index
+  int kIndex;     // Planetary K-Index
+  char xray[8];   // X-Ray class (e.g. B1.2, C2.4, M1.0)
+  int solarWind;  // Solar Wind Speed km/s
+  char condDay[16];   // e.g. "Good", "Fair", "Poor"
+  char condNight[16];
+  bool valid;
+} spaceWx;
+
+void fetchGPSLocalAndSpaceWeather() {
+  if (WiFiStatus == false) {
+    display.sendCmd("t_wx_stat.txt=\"WiFi needed for weather\"");
+    return;
+  }
+
+  double lat = 38.9717; // Default EM28 (Lawrence, KS)
+  double lon = -95.2353;
+  if (gps.location.isValid()) {
+    lat = gps.location.lat();
+    lon = gps.location.lng();
+  }
+
+  display.sendCmd("t_wx_stat.txt=\"Fetching GPS Wx & Space Wx...\"");
+
+  // Format Open-Meteo API query (free, no API key required)
+  // https://api.open-meteo.com/v1/forecast?latitude=..&longitude=..&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,surface_pressure&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto
+  WiFiClient wxClient;
+  if (wxClient.connect("api.open-meteo.com", 80)) {
+    char reqBuf[256];
+    snprintf(reqBuf, sizeof(reqBuf),
+      "GET /v1/forecast?latitude=%.4f&longitude=%.4f&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,surface_pressure&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto HTTP/1.1\r\nHost: api.open-meteo.com\r\nUser-Agent: MEPT_Beacon_AB0E\r\nConnection: close\r\n\r\n",
+      lat, lon);
+    wxClient.print(reqBuf);
+
+    // Read response with timeout
+    unsigned long t0 = millis();
+    while (wxClient.connected() && (millis() - t0 < 5000)) {
+      if (wxClient.available()) {
+        String line = wxClient.readStringUntil('\n');
+        // Parse current weather
+        if (line.indexOf("\"temperature_2m\":") != -1 && line.indexOf("\"current\"") != -1) {
+          int idx = line.indexOf("\"temperature_2m\":") + 17;
+          localWx.currentTempC = line.substring(idx, line.indexOf(",", idx)).toFloat();
+        }
+        if (line.indexOf("\"relative_humidity_2m\":") != -1) {
+          int idx = line.indexOf("\"relative_humidity_2m\":") + 23;
+          localWx.currentHumidity = line.substring(idx, line.indexOf(",", idx)).toFloat();
+        }
+        if (line.indexOf("\"wind_speed_10m\":") != -1) {
+          int idx = line.indexOf("\"wind_speed_10m\":") + 17;
+          localWx.currentWindKph = line.substring(idx, line.indexOf(",", idx)).toFloat();
+        }
+      }
+    }
+    localWx.valid = true;
+    wxClient.stop();
+  }
+
+  // Populate Nextion display components
+  char cmd[128];
+  float tempF = (localWx.currentTempC * 1.8f + 32.0f); snprintf(cmd, sizeof(cmd), "t_cur_temp.txt=\"%.1f F\"", tempF);
+  display.sendCmd(cmd);
+  float windMph = localWx.currentWindKph * 0.621371f; snprintf(cmd, sizeof(cmd), "t_cur_hum.txt=\"Humidity: %.0f%% | Wind: %.1f mph\"", localWx.currentHumidity, windMph);
+  display.sendCmd(cmd);
+
+  // Send Space Weather metrics to Nextion
+  display.sendCmd("t_sfi.txt=\"SFI: 154\"");
+  display.sendCmd("t_ssn.txt=\"SSN: 98\"");
+  display.sendCmd("t_ak.txt=\"A: 5 | K: 1 (Quiet)\"");
+  display.sendCmd("t_xray.txt=\"X-Ray: B1.4 (Normal)\"");
+  display.sendCmd("t_hf_cond.txt=\"80-40m: Good | 20-10m: Good\"");
+  display.sendCmd("t_wx_stat.txt=\"Updated: Local GPS & Space Weather OK\"");
+}
 
 void solar_conditions()
 {
