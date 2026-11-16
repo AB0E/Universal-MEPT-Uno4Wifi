@@ -1,0 +1,22 @@
+firmware:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '*.ino'
+          - 'WSPR_FT8_FST4W_Symbols.txt'
+
+nextion-ui:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'nextion_*'
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '*.md'
+          - '*.png'
+
+ci-workflows:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/**/
+*'
