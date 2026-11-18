@@ -1,16 +1,14 @@
 /*
-  Si5351 bandswitched WSPR, FST4W, FT8, CW, QRSS, DFCW, and Hellschreiber source
-  designed for 2200 - 10 meters using an Arduino UNO R4 WiFi.
-  Internet time using WiFi connection or GPS is used for timing.
+  Si5351 bandswitched WSPR and FST4W source designed for 2200 - 10 meters using
+  an Arduino Nano 33 IoT. Internet time using  WiFi connection is used for timing.
 
   This sketch uses a frequency resolution down to 0.01 Hz to provide optimum
-  resolution for the FST4W/WSPR tone separation specification. This limits
+  reolution for the FST4W/WSPR tone separation specification. This limits
   the upper frequency to 40 MHz.
 
-  This sketch is developed for use with the Arduino UNO R4 WiFi, Nextion Touch
-  Display, and a relay-switched 40m/20m/10m Bandpass Filter (BPF) bank.
-  FST4W 900 and 1800 mode operation is dependent upon Si5351 oscillator and
-  Arduino UNO R4 WiFi millisecond timing stability.
+  This sketch is developed for use with the K4CLE circuit board. This board does
+  not support FST4W 900 and 1800 operation. FST4W 900 and 1800 mode operation is
+  dependent upon Si5351 oscillator and Nano 33 IoT millisecond timing stability.
 
   Permission is granted to use, copy, modify, and distribute this software
   and documentation for non-commercial purposes.
@@ -1098,13 +1096,8 @@ int touchReadButton(uint8_t pin) {
 }
 
 //***********************************************************************
-// This interrupt is used for Arduino UNO R4 WiFi millisecond calibration.
-// Called every second by the DS3231 RTC 1PPS (1 Pulse Per Second) signal on pin D2.
-//
-// Beginner Note: The Arduino's internal clock can drift slightly with
-// temperature changes. Every 100 seconds, this function checks how many
-// internal milliseconds (millis) elapsed during 100 real-world seconds
-// and stores that calibration number in 'MsecCF' to keep digital mode timing exact.
+// This interrupt is used Nano 33 IoT millisecond calibration
+// Called every second by from the DS3231 RTC 1PPS to Nano pin D2
 //***********************************************************************
 void Interrupt()
 {
@@ -1822,19 +1815,14 @@ void loop() {
       display.display();
 
     }
-    // Daily Automatic Clock Re-Sync at 23:57:00 UTC:
-    // Beginner Note: In C++, a single '=' sets a variable to a new value,
-    // while a double '==' asks a question ("are these two values equal?").
-    // Also, '&&' means logical AND ("both conditions must be true") and '||' means OR.
-    if (WiFiStatus == true || validGPSflag == true)
+    if (WiFiStatus == true | validGPSflag == true)
     {
-      if (hours == 23 && minutes == 57 && seconds == 0 && timeSet_toggle == true)
+      if (hours == 23 & minutes == 57 & seconds == 0 & timeSet_toggle == true)
       {
         updateRTCtime();
-        timeSet_toggle = false; // Lock out further writes during this second so we don't spam the RTC chip
+        timeSet_toggle = false; // Set to prevent multiple writes to DS3231 RTC
       }
-      // Two seconds later (at 23:57:02), re-arm the toggle (= true) so it is ready for tomorrow!
-      if (hours == 23 && minutes == 57 && seconds == 2) timeSet_toggle = true;
+      if (hours == 23 & minutes == 57 & seconds == 2) timeSet_toggle == true;
     }
   }
 }
@@ -2141,8 +2129,7 @@ void tinyGPS_calcGridSquare()
         }
         EEPROM.put(122, 1);     // Now set grid square change flag
         altDelay(4000);
-        // Beginner Note: Use a single '=' to set doOneTimeTrigger_2 to false so we exit the screen!
-        doOneTimeTrigger_2 = false;
+        doOneTimeTrigger_2 == false;
       }
     }
    }    
@@ -3726,7 +3713,8 @@ void setfreq()
 void transmit()
 {
   TransmitFlag = false;
-  if (mode < 8) // If not in schedule mode, check whether this slot matches our TX interval
+  //int SymbolCount;
+  if (mode < 8) // if not in schedule mode check transmit interval
   {
     TXcount++;
     if (TXcount > TXinterval) TXcount = 1;
@@ -3738,12 +3726,9 @@ void transmit()
     }
   }
   
-  // Beginner Note: Always initialize local counter variables to '= 0'.
-  // In C++, uninitialized variables contain random leftover memory numbers,
-  // which would cause the transmitter loop below to start at the wrong tone or skip transmitting!
-  int SymbolCount = 0, Gaussian_Count = 0, offset = 0;
-  byte LastSymbol = 0, NowSymbol = 0, NextSymbol = 0;
-  unsigned int sum = 0;
+  int SymbolCount, Gaussian_Count, offset;
+  byte LastSymbol, NowSymbol, NextSymbol;
+  unsigned int sum;
 
   time_now = millis();
   suspendUpdateFlag = true;
@@ -3752,70 +3737,63 @@ void transmit()
     TXoffset = TXoffset + 10UL;
     if (TXoffset > 1550UL) TXoffset = 1440UL;
   }
-  setSWRRelay(false);                // Ensure SWR bridge is bypassed for full transmit power
-  selectBandLPF(TXdialFreq[TXband]); // Switch in the correct 40m / 20m / 10m Bandpass Filter
-  Si5351_write(CLK_ENABLE_CONTROL, 0b00000101); // Turn ON RF output on CLK1 (disable CLK0 & CLK2)
+  setSWRRelay(false);
+  selectBandLPF(TXdialFreq[TXband]);
+  Si5351_write(CLK_ENABLE_CONTROL, 0b00000101); // Enable CLK1 - disable CLK0 & CLK2
   setfreq();
   display.setCursor(0, 32);
   display.print(F(" XMITTING "));
   display.setCursor(0, 48);
-  if (TransmitMode > 1 && TransmitMode < 8) display.print(F("FST4W "));
+  if (TransmitMode > 1 & TransmitMode < 8) display.print(F("FST4W "));
   if (TransmitMode == 1) display.print(F(" WSPR "));
-  display.print(T_R_time[T_R_period]);
+  display.print(T_R_time [T_R_period]);
   display.print(F(" "));
   display.display();
   digitalWrite(XmitLED, HIGH);
+  symbolTime = (SymbolLength[T_R_period] * MsecCF) / 100000;  // Calibrate symbol time
+  GaussianTime = ((SymbolLength[T_R_period] * MsecCF) / 100) / 32; // Calibrate Gaussian time
+  unsigned long currentTime = millis();
 
-  // Beginner Note: If the 100-second RTC calibration hasn't completed yet (MsecCF == 0),
-  // default to 100000 ms (100.000 seconds) so the beacon transmits at normal speed right after boot.
-  int activeCF = (MsecCF > 90000 && MsecCF < 110000) ? MsecCF : 100000;
-  symbolTime = (SymbolLength[T_R_period] * activeCF) / 100000;      // Calibrate WSPR symbol time in ms
-  GaussianTime = ((SymbolLength[T_R_period] * activeCF) / 100) / 32; // Calibrate FST4W step time in us
-
-  // 1. WSPR mode transmit (162 tones):
+  // WSPR mode transmit follows:
   if (TransmitMode == 1)
   {
     while (SymbolCount < 162)
     {
       unsigned long timer = millis();
-      si5351aSetFreq(SYNTH_MS_1, (TXdialFreq[TXband] + TXoffset), OffsetFreq[0][sym[SymbolCount]]);
-      while ((millis() - timer) <= symbolTime) { __asm__("nop\n\t"); }
+      si5351aSetFreq(SYNTH_MS_1, (TXdialFreq [TXband] + TXoffset), OffsetFreq [0][sym[SymbolCount]]); // WSPR mode
+      while ((millis() - timer) <= symbolTime) {__asm__("nop\n\t");}
       SymbolCount++;
     }
   }
-  // 2. FST4W mode transmit (160 tones with 32-step Gaussian smoothing between tones):
-  else
-  {
-    while (SymbolCount < 160)
-    {
-      // Beginner Note: Array indices in C++ go from 0 to 159.
-      // When SymbolCount is 0 (the very first tone), looking at [SymbolCount - 1] would read
-      // invalid memory slot -1. The '? :' check below safely uses tone 0 at the start and tone 159 at the end.
-      LastSymbol = (SymbolCount == 0)   ? FST4Wsymbols[0]   : FST4Wsymbols[SymbolCount - 1];
-      NowSymbol  = FST4Wsymbols[SymbolCount];
-      NextSymbol = (SymbolCount == 159) ? FST4Wsymbols[159] : FST4Wsymbols[SymbolCount + 1];
 
-      while (Gaussian_Count < 32)
-      {
-        unsigned long timer = micros();
-        if (Gaussian_Count < 16)
-          sum = (LastSymbol * gaussian_table[16 - Gaussian_Count]) + (NowSymbol * gaussian_table[Gaussian_Count + 16]);
-        else
-          sum = (NowSymbol * gaussian_table[47 - Gaussian_Count]) + (NextSymbol * gaussian_table[Gaussian_Count - 16]);
-         
-        offset = (FST4W_OffsetFreq[T_R_period] * sum) / 100; 
-     
-        si5351aSetFreq(SYNTH_MS_1, (TXdialFreq[TXband] + TXoffset), offset);
-        while ((micros() - timer) <= GaussianTime) { __asm__("nop\n\t"); }
-        Gaussian_Count++;
-      }
-      Gaussian_Count = 0; // Reset sub-step counter for the next tone
-      SymbolCount++;
-    }
+   //FST4W mode tranmit follows:
+   else   
+   while(SymbolCount < 160)
+   {
+    //Serial.println(SymbolCount);
+     LastSymbol = FST4Wsymbols[SymbolCount - 1];
+     NowSymbol = FST4Wsymbols[SymbolCount];
+     NextSymbol = FST4Wsymbols[SymbolCount + 1];
+     //for (Gaussian_Count = 0; Gaussian_Count < 32; Gaussian_Count++)
+    while (Gaussian_Count < 32)
+     {
+      //Serial.print(Gaussian_count);
+      unsigned long timer = micros();
+      if (Gaussian_Count < 16) sum = (LastSymbol * gaussian_table[16 - Gaussian_Count]) + (NowSymbol * (gaussian_table[(Gaussian_Count + 16)]));
+      else sum = (NowSymbol * (gaussian_table[(47 - Gaussian_Count)])) + (NextSymbol * gaussian_table[Gaussian_Count - 16]);
+       
+      offset = ((FST4W_OffsetFreq[T_R_period] * sum)) / 100; 
+   
+     si5351aSetFreq(SYNTH_MS_1, (TXdialFreq [TXband] + TXoffset), offset); // FST4W mode
+     while ((micros() - timer) <= GaussianTime) { __asm__("nop\n\t");}
+     Gaussian_Count++;
+     }
+   Gaussian_Count = 0;
+   SymbolCount++;
   }
  
   suspendUpdateFlag = false;
-  Si5351_write(CLK_ENABLE_CONTROL, 0b00000111); // Turn OFF all Si5351 RF clocks
+  Si5351_write(CLK_ENABLE_CONTROL, 0b00000111); // disable CLKs
   digitalWrite(XmitLED, LOW);
   TransmitFlag = true;
 }
@@ -3824,7 +3802,7 @@ void transmit()
 
 //******************************************************************
 // FT8 Transmit algorithm follows:
-// Configures data and timing and then sends 79 Gaussian-smoothed tones to the Si5351
+// Configures data and timing and then sends data to the Si5351
 //
 // Called by loop()
 //******************************************************************
@@ -3842,43 +3820,39 @@ void FT8transmit()
   display.print(F("   FT8    "));
   display.display();
   digitalWrite(XmitLED, HIGH);
+  symbolTime = (160 * MsecCF) / 100000;
+  int SymbolCount, Gaussian_Count, offset;
+  byte LastSymbol, NowSymbol, NextSymbol;
+  unsigned int sum;
+  GaussianTime = ((FT8_SymbolLength * MsecCF) / 100) / 32;
 
-  // Beginner Note: Initialize all counters to 0 so the 79-symbol FT8 loop starts cleanly at 0.
-  int SymbolCount = 0, Gaussian_Count = 0, offset = 0;
-  byte LastSymbol = 0, NowSymbol = 0, NextSymbol = 0;
-  unsigned int sum = 0;
-
-  int activeCF = (MsecCF > 90000 && MsecCF < 110000) ? MsecCF : 100000;
-  symbolTime = (160 * activeCF) / 100000;
-  GaussianTime = ((FT8_SymbolLength * activeCF) / 100) / 32;
-
-  while (SymbolCount < 79)
-  {
-    // Safe boundary check so index 0 and index 78 never read outside FT8symbols[0..78]
-    LastSymbol = (SymbolCount == 0)  ? FT8symbols[0]  : FT8symbols[SymbolCount - 1];
-    NowSymbol  = FT8symbols[SymbolCount];
-    NextSymbol = (SymbolCount == 78) ? FT8symbols[78] : FT8symbols[SymbolCount + 1];
-
+ while(SymbolCount < 79)
+   {
+    //Serial.println(SymbolCount);
+     LastSymbol = FT8symbols[SymbolCount - 1];
+     NowSymbol = FT8symbols[SymbolCount];
+     NextSymbol = FT8symbols[SymbolCount + 1];
+     //for (Gaussian_Count = 0; Gaussian_Count < 32; Gaussian_Count++)
     while (Gaussian_Count < 32)
-    {
+     {
+      //Serial.print(Gaussian_count);
       unsigned long timer = micros();
-      if (Gaussian_Count < 16)
-        sum = (LastSymbol * gaussian_table[16 - Gaussian_Count]) + (NowSymbol * gaussian_table[Gaussian_Count + 16]);
-      else
-        sum = (NowSymbol * gaussian_table[47 - Gaussian_Count]) + (NextSymbol * gaussian_table[Gaussian_Count - 16]);
+      if (Gaussian_Count < 16) sum = (LastSymbol * gaussian_table[16 - Gaussian_Count]) + (NowSymbol * (gaussian_table[(Gaussian_Count + 16)]));
+      else sum = (NowSymbol * (gaussian_table[(47 - Gaussian_Count)])) + (NextSymbol * gaussian_table[Gaussian_Count - 16]);
        
-      offset = (625 * sum) / 100; 
+      offset = ((625 * sum)) / 100; 
    
-      si5351aSetFreq(SYNTH_MS_1, (TXdialFreq[TXband] + FT8_TXoffset), offset);
-      while ((micros() - timer) <= GaussianTime) { __asm__("nop\n\t"); }
-      Gaussian_Count++;
-    }
-    Gaussian_Count = 0;
-    SymbolCount++;
+     si5351aSetFreq(SYNTH_MS_1, (TXdialFreq [TXband] + TXoffset), offset); // FST4W mode
+     while ((micros() - timer) <= GaussianTime) { __asm__("nop\n\t");}
+     Gaussian_Count++;
+     }
+   Gaussian_Count = 0;
+   SymbolCount++;
   }
 
+
   suspendUpdateFlag = false;
-  Si5351_write(CLK_ENABLE_CONTROL, 0b00000111); // Turn OFF all Si5351 RF clocks
+  Si5351_write(CLK_ENABLE_CONTROL, 0b00000111); // disable CLKs
   digitalWrite(XmitLED, LOW);
   TransmitFlag = true;
 }
@@ -4437,25 +4411,21 @@ uint8_t Si5351_write(uint8_t addr, uint8_t data)
   Wire.beginTransmission(Si5351A_addr);
   Wire.write(addr);
   Wire.write(data);
-  return Wire.endTransmission(); // Returns 0 when I2C write succeeds
+  Wire.endTransmission();
 }
 
 
 //******************************************************************
 // Alternate delay function follows:
-// Beginner Note: Standard Arduino delay() blocks the screen from
-// reading touch presses. This function waits while continuously
-// checking the Nextion touch screen.
+// altDelay is used because the command "delay" causes critical
+// timing errors.
 //
-// Why we use (millis() - time_now) < delayTime:
-// The Arduino millisecond counter resets back to 0 every ~49.7 days.
-// Subtracting start time from current time handles that reset
-// automatically without ever locking up the beacon!
+// Called by all functions
 //******************************************************************
 unsigned long altDelay(unsigned long delayTime)
 {
   time_now = millis();
-  while ((millis() - time_now) < delayTime)
+  while (millis() < time_now + delayTime) //delay 1 second
   {
     pollNextionTouch();
     __asm__ __volatile__ ("nop");

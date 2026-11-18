@@ -1,6 +1,6 @@
 # Nextion 2.8" Touch Screen Hierarchical Menu & UI Architecture
 ## Station AB0E | Grid EM28 | Rig: MEPT Beacon (UNO R4 WiFi & NX3224T024)
-### GitHub Repository: https://github.com/AB0E/Universal-MEPT-Uno4Wifi
+### GitHub Repository: https://github.com/AB0E/W3PM-Nano-33-IOT-Universal-MEPT
 
 ---
 
@@ -27,7 +27,7 @@ In place of legacy physical buttons (`PB1`, `PB2`, `PB3`, `PB4`), the Nextion 2.
          v            v               v            v            v            v
      [SUB-MENU 1] [SUB-MENU 2]    [SUB-MENU 3] [SUB-MENU 4] [SUB-MENU 5] [SUB-MENU 6]
       MODULATION   RF BANDS &     ANT TUNE &    TIMING &     STATION &    SPACE WX &
-      SELECTION    BPF RELAYS     SWR METER     CALIBRATION  POWER        RELAY TEST
+      SELECTION    LPF RELAYS     SWR METER     CALIBRATION  POWER        RELAY TEST
        (Page 2)     (Page 3)       (Page 4)      (Page 5)     (Page 6)     (Page 7)
 ```
 
@@ -41,7 +41,7 @@ In place of legacy physical buttons (`PB1`, `PB2`, `PB3`, `PB4`), the Nextion 2.
   * Line 0 (`t0`): Real-time UTC Clock & GPS Lock status (`21:47:18 UTC GPS LOCKED`).
   * Line 1 (`t1`): Active Mode, Band & Dial Frequency (`WSPR-2 20m 14.097100 MHz`).
   * Line 2 (`t2`): Forward Power & Live SWR readout (`Tx: 7dBm  SWR: 1.15 : 1`).
-  * Line 3 (`t3`): Active Filter Relay & Countdown (`20m BPF [D6 ON] Next: 00:42`).
+  * Line 3 (`t3`): Active Filter Relay & Countdown (`20m LPF [D6 ON] Next: 00:42`).
 * **Visual Progress Bar (`j0`)**: Active sequence countdown (0–100%).
 * **Quick Touch Bar**: `[ DOWN - ]`, `[ SELECT ]`, `[ NEXT > ]`, `[ UP + ]`, `[ SAVE ]`, `[ MENU ]`.
 
@@ -51,7 +51,7 @@ In place of legacy physical buttons (`PB1`, `PB2`, `PB3`, `PB4`), the Nextion 2.
 Presents 6 clean, colorful touch tiles linking directly into dedicated sub-menus:
 1. **`[ 1. MODULATION MODES ]`** $
 ightarrow$ Jumps to Page 2
-2. **`[ 2. BANDS & BPF FILTERS ]`** $
+2. **`[ 2. BANDS & LPF FILTERS ]`** $
 ightarrow$ Jumps to Page 3
 3. **`[ 3. ANTENNA TUNE & SWR ]`** $
 ightarrow$ Jumps to Page 4
@@ -88,7 +88,7 @@ ightarrow$ `prstr "M7"`
 ightarrow$ `prstr "M8"`
 * Controls: `[ APPLY & SAVE ]` (sends `'S'`), `[ < BACK TO MENU ]` (returns to Page 1).
 
-#### Sub-Menu 2: Bands & BPF Filters (`sub_band` - Page 3)
+#### Sub-Menu 2: Bands & LPF Filters (`sub_band` - Page 3)
 * Direct band selection matrix:
   * **40m** (7.038 / 7.074 MHz) $
 ightarrow$ Energizes Relays **K2 & K3 (Pin D5)**
@@ -97,7 +97,7 @@ ightarrow$ Energizes Relays **K4 & K5 (Pin D6)**
   * **10m** (28.074 / 28.124 MHz) $
 ightarrow$ Energizes Relays **K6 & K7 (Pin D7)**
   * Other bands (160m, 80m, 30m, 17m, 15m, 12m, 6m)
-* Live Filter Status Card: Displays toroid core specifications (**Bourns 78F/9230 Axial RF Inductors (or T50-6 / T50-2 Powdered Iron)**) and active relay coil indicators.
+* Live Filter Status Card: Displays toroid core specifications (**FT 37-43**) and active relay coil indicators.
 
 #### Sub-Menu 3: Antenna Tune & SWR Meter (`sub_swr` - Page 4)
 * Visual analog-style SWR bar gauge with color threshold zones:
@@ -132,9 +132,9 @@ ightarrow$ Stores values in Arduino EEPROM.
 * **Elegoo 8-Channel Relay Diagnostic Board**:
   * Real-time toggles to individually click test each relay coil:
     * `Relay 1 (D4)`: SWR Bridge
-    * `Relays 2-3 (D5)`: 40m BPF
-    * `Relays 4-5 (D6)`: 20m BPF
-    * `Relays 6-7 (D7)`: 10m BPF
+    * `Relays 2-3 (D5)`: 40m LPF
+    * `Relays 4-5 (D6)`: 20m LPF
+    * `Relays 6-7 (D7)`: 10m LPF
 * **Solar & Space Weather**: SFI, Sunspot Number (SSN), A-Index, K-Index.
 
 ---
@@ -142,16 +142,16 @@ ightarrow$ Stores values in Arduino EEPROM.
 ## 3. GitHub Repository Synchronization
 
 All firmware source files, Nextion HMI layouts, and wiring schematics align directly with your project repository:
-* **Repository**: [`https://github.com/AB0E/Universal-MEPT-Uno4Wifi`](https://github.com/AB0E/Universal-MEPT-Uno4Wifi)
+* **Repository**: [`https://github.com/AB0E/W3PM-Nano-33-IOT-Universal-MEPT`](https://github.com/AB0E/W3PM-Nano-33-IOT-Universal-MEPT)
 * **Branch Target**: `main`
 * **Directory Structure**:
   * `/w3pm_UltimateMEPT_V2_1.ino` (Arduino sketch)
   * `/nextion_screen_design.md` (This document)
   * `/nextion_ui_simulator.html` (Interactive browser simulator)
   * `/w3pm_style_system_wiring_diagram.png` (Publication wiring schematic)
-  * `/lpf_40m_toroid_schematic.png` (40m Bourns 78F/9230 Axial RF Inductors (or T50-6 / T50-2 Powdered Iron) BPF schematic)
-  * `/lpf_20m_toroid_schematic.png` (20m Bourns 78F/9230 Axial RF Inductors (or T50-6 / T50-2 Powdered Iron) BPF schematic)
-  * `/lpf_10m_toroid_schematic.png` (10m Bourns 78F/9230 Axial RF Inductors (or T50-6 / T50-2 Powdered Iron) BPF schematic)
+  * `/lpf_40m_toroid_schematic.png` (40m FT 37-43 LPF schematic)
+  * `/lpf_20m_toroid_schematic.png` (20m FT 37-43 LPF schematic)
+  * `/lpf_10m_toroid_schematic.png` (10m FT 37-43 LPF schematic)
   * `/WSPR_FT8_FST4W_Symbols.txt` (Mode specifications & symbol tables)
 
 ---

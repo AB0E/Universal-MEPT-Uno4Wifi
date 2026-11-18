@@ -1,45 +1,40 @@
 # W3PM Universal MEPT Beacon Firmware & Hardware Guide
 ### Callsign: AB0E | Grid Square: EM28 | Arduino UNO R4 WiFi & Nextion HMI
-### GitHub Repository: https://github.com/AB0E/Universal-MEPT-Uno4Wifi
 
 ---
 
 ## 1. System Architecture
 
-This project adapts the classic W3PM Ultimate Multi-mode MEPT (Manned Experimental Propagation Transmitter) firmware to modern hardware (replacing all legacy Arduino Nano 33 IoT references):
+This project adapts the classic W3PM Ultimate Multi-mode MEPT (Manned / Manned Experimental Propagation Transmitter) firmware to modern 2026 hardware:
 * **Microcontroller**: Arduino UNO R4 WiFi (Renesas RA4M1 32-bit ARM Cortex-M4 @ 48 MHz)
 * **Frequency Synthesizer**: Silicon Labs Si5351A I2C Clock Generator breakout
-* **HMI Display**: Nextion NX3224T024 / NX3224T028 UART resistive touch LCD (320x240)
+* **HMI Display**: Nextion NX3224T024 2.8" UART resistive touch LCD (320x240)
 * **Real-Time Clock**: DS3231 High-Precision TCXO RTC on I2C (address `0x68`)
 * **Relay Module**: ELEGOO 8-Channel DC 5V Relay Module with Optocoupler (Active-LOW)
-* **RF Filtering**: 3-Band LC Band-Pass Filter (BPF) Bank for 40m, 20m, and 10m (Through-Hole Perfboard)
 * **Supported Modes**: WSPR-2, FT8, FST4W-120, CW, FSKCW, QRSS, DFCW, Hellschreiber
 
 ---
 
-## 2. Arduino UNO R4 WiFi Hardware Pinout & Virtual Touch Mapping
+## 2. Hardware Pinout & Wiring Table
 
-All legacy physical pushbuttons (`PB1`–`PB4` and `MENU`) have been eliminated and replaced by virtual touch codes (`VBTN_PB1` = 101 through `VBTN_MENU` = 105) sent over `Serial1` from the Nextion touch screen.
-
-| Arduino UNO R4 WiFi Pin | Connected Peripheral | Function / Logic Level |
+| Arduino UNO R4 Pin | Hardware Peripheral | Connection Details / Logic Level |
 | :--- | :--- | :--- |
-| **D0 (RX0)** | Nextion Display TX (Blue wire) | Hardware `Serial1` RX @ 9600 baud |
-| **D1 (TX0)** | Nextion Display RX (Yellow wire) | Hardware `Serial1` TX @ 9600 baud |
-| **D2** | DS3231 RTC `SQW` Pin | 1PPS Interrupt Input (`FALLING` edge) for millisecond calibration |
-| **D3** | External CW Keying Socket | `INPUT_PULLUP` (LOW = internal Si5351 CW; HIGH = key external rig) |
-| **D4** | **ELEGOO Relay IN1 (K1)** | **SWR Bridge Relay** (Active-LOW: LOW only during `ANT TUNE`) |
-| **D5** | **ELEGOO Relay IN2 & IN3 (K2/K3)** | **40m Bandpass Filter Relay** (Active-LOW: LOW for <= 7.5 MHz) |
-| **D6** | **ELEGOO Relay IN4 & IN5 (K4/K5)** | **20m Bandpass Filter Relay** (Active-LOW: LOW for 7.5 - 15.0 MHz) |
-| **D7** | **ELEGOO Relay IN6 & IN7 (K6/K7)** | **10m Bandpass Filter Relay** (Active-LOW: LOW for > 15.0 MHz) |
-| **D8** | Optional GPS Module `TX` | `gpsSerial` RX @ 9600 baud |
-| **D9** | Optional GPS Module `RX` | `gpsSerial` TX @ 9600 baud |
-| **D13** | Onboard LED (`LED_BUILTIN`) | Visual CW / FSK keying indicator |
-| **A0 (D14)** | Transmit LED / PTT Output | `XmitLED` (HIGH during transmit) |
-| **A1 (D15)** | Minute LED | `MinLED` indicator |
-| **A2 (D16)** | Second LED | `SecLED` indicator |
-| **A3 (D17)** | SWR Bridge Detector Input | Reads analog voltage from 1N34A/1N5711 detector during `ANT TUNE` |
-| **A4 (D18 / SDA)** | Si5351A & DS3231 `SDA` | I2C Data Line |
-| **A5 (D19 / SCL)** | Si5351A & DS3231 `SCL` | I2C Clock Line |
+| **D0 (RX1)** | Nextion Display TX (Blue wire) | Hardware `Serial1` RX (3.3V / 5V tolerant) |
+| **D1 (TX1)** | Nextion Display RX (Yellow wire) | Hardware `Serial1` TX (Direct connection) |
+| **D2** | PushButton 1 / Touch Interrupt | Internal Pullup (Virtual mapping to Nextion PB1) |
+| **D3** | PushButton 2 / Touch Interrupt | Internal Pullup (Virtual mapping to Nextion PB2) |
+| **D4** | **SWR Bridge Relay (IN1)** | **Active-LOW**: Energized ONLY during ANT TUNE |
+| **D5** | **40m Lowpass Filter Relay (IN2/3)** | **Active-LOW**: Energized for <= 7.5 MHz |
+| **D6** | **20m Lowpass Filter Relay (IN4/5)** | **Active-LOW**: Energized for 7.5 - 15.0 MHz |
+| **D7** | **10m Lowpass Filter Relay (IN6/7)** | **Active-LOW**: Energized for > 15.0 MHz |
+| **D8 (RX)** | Optional GPS Module TX | SoftwareSerial / NMEA 9600 baud GPS receiver |
+| **D9 (TX)** | Optional GPS Module RX | SoftwareSerial / NMEA 9600 baud GPS receiver |
+| **D10** | PushButton 3 | Internal Pullup (Virtual mapping to Nextion PB3) |
+| **D11** | PushButton 4 | Internal Pullup (Virtual mapping to Nextion PB4) |
+| **A4 / SDA** | Si5351A & DS3231 SDA | I2C Data bus |
+| **A5 / SCL** | Si5351A & DS3231 SCL | I2C Clock bus |
+| **A0** | SWR Forward Voltage ($V_f$) | Analog input (0 - 5V) from resistive bridge |
+| **A1** | SWR Reverse Voltage ($V_r$) | Analog input (0 - 5V) from resistive bridge |
 
 ---
 
@@ -64,3 +59,12 @@ The relay module inputs (`IN1` through `IN8`) use optocouplers:
 * Setting an Arduino digital pin **LOW (0V)** turns the relay **ON** (contacts closed).
 * Setting an Arduino digital pin **HIGH (+5V)** turns the relay **OFF** (contacts open).
 * In `w3pm_UltimateMEPT_V2_1.ino`, all relay pins are pre-loaded `HIGH` before `pinMode(OUTPUT)` to prevent contact chattering during power-up.
+
+---
+
+## 5. Nextion Display Setup
+
+1. Copy `nextion_screen_design.md` settings into **Nextion Editor**.
+2. Generate Fonts: Font 0 (16px), Font 1 (24px bold), Font 2 (20px bold).
+3. Place text components `t0`, `t1`, `t2`, `t3` and buttons `b0` through `b5`.
+4. Compile to `.tft` file and flash via FAT32 MicroSD card.
